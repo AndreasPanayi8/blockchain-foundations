@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run: Bun (direct)",
+      "type": "pwa-node",
+      "request": "launch",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["index.ts"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "outputCapture": "std",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {}
+    }
+  ]
+}
