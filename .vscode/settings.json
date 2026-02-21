@@ -1,6 +1,0 @@
-{
-  "code-runner.executorMap": {
-    "typescript": "bun"
-  },
-  "code-runner.runInTerminal": true
-}
