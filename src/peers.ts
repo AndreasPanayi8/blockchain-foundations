@@ -2,8 +2,8 @@ function get_peers() : Set<string> {
   return new Set()
 }
 
-function update_peers(new_peers : Set<string>) {
+function add_peer(peer_id: string) {
 
 }
 
-export {get_peers, update_peers}
+export {get_peers, add_peer}

@@ -8,5 +8,9 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "canonicalize": "^2.1.0",
+    "zod": "^4.3.6"
   }
 }
