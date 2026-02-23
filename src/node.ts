@@ -69,7 +69,8 @@ const server = createServer(async (socket) => {
                     name: 'INVALID_FORMAT',
                     description: 'Received invalid message that could not parse as json ' + message          
                 })
-                continue
+                socket.end()
+                return
             }
 
             try {
@@ -81,7 +82,8 @@ const server = createServer(async (socket) => {
                     name: 'INVALID_FORMAT',
                     description: 'Received invalid protocol message ' + message
                 })
-                continue
+                socket.end()
+                return
             }
 
             if (!connected_peers.has(id) && message.type != 'hello') {
@@ -91,7 +93,8 @@ const server = createServer(async (socket) => {
                     name: 'INVALID_HANDSHAKE',
                     description: 'Did not recieve hello message'
                 })
-                continue
+                socket.end()
+                return
             }
 
             switch (message.type) {
@@ -128,6 +131,12 @@ const server = createServer(async (socket) => {
 
         if (messages[0] === undefined) {
             console.error('Error in parsing messages')
+            send_message(socket, {
+                type: 'error',
+                name: 'INTERNAL_ERROR',
+                description: 'Error in parsing messages'
+            })
+            socket.end()
             return
         }
 
