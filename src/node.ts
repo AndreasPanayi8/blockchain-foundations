@@ -3,28 +3,8 @@ import { Socket, createServer } from 'net'
 
 import { type Message, MessageSchema  } from './types'
 import canonicalize from 'canonicalize'
-import { error } from 'console'
 import { add_peer, get_peers } from './peers'
 
-const SERVER_PORT = 18018
-const SERVER_HOST = '0.0.0.0'
-
-const client = new Socket()
-client.connect(SERVER_PORT, SERVER_HOST, () => {
-    
-})
-
-client.on('data', (data) => {
-
-})
-
-client.on('error', (error) => {
-    console.error(`Received error ${error}`)
-})
-
-client.on('close', () => {
-    console.log('Client disconnected')
-})
 
 async function connect(socket: Socket) {
     await send_message(socket, {
@@ -69,6 +49,7 @@ async function send_message(socket: Socket, msg: Message) {
 }
 
 function attach_handlers(socket: Socket, id: string) {
+  socket.setEncoding('utf8')  
   let buffer = ''
 
   socket.on('data', (data) => {
@@ -86,7 +67,7 @@ function attach_handlers(socket: Socket, id: string) {
         send_message(socket, {
           type: 'error',
           name: 'INVALID_FORMAT',
-          description: 'Could not parse JSON'
+          description: 'Received invalid message that could not parse a json'
         } as Message)
         socket.end()
         return
@@ -98,7 +79,7 @@ function attach_handlers(socket: Socket, id: string) {
         send_message(socket, {
           type: 'error',
           name: 'INVALID_FORMAT',
-          description: 'Message does not match schema'
+          description: 'Received invalid protocol message that does not match schema'
         } as Message)
         socket.end()
         return
@@ -108,7 +89,7 @@ function attach_handlers(socket: Socket, id: string) {
         send_message(socket, {
           type: 'error',
           name: 'INVALID_HANDSHAKE',
-          description: 'Expected hello as first message'
+          description: 'Did not receive hello message first'
         } as Message)
         socket.end()
         return
@@ -116,21 +97,20 @@ function attach_handlers(socket: Socket, id: string) {
 
       switch (message.type) {
         case 'hello':
+          console.log(`[${id}]: Received hello message, connecting to node with name ${message.agent} and version ${message.version}`)
           connected_peers.add(id)
-          if (!discovered_peers.has(id)) {
-            discovered_peers.add(id)
-            add_peer(id)
-          }
           break
 
         case 'getpeers':
+           console.log(`[${id}]: Requested peers, sending discovered peers`) 
           send_message(socket, {
             type: 'peers',
-            peers: Array.from(discovered_peers).concat(SERVER_ID)
+            peers: Array.from(discovered_peers)
           } as Message)
           break
 
         case 'peers':
+          console.log(`[${id}]: Received peers, updating discovered peers`)
           for (const peer_id of message.peers) {
             if (!discovered_peers.has(peer_id)) {
               discovered_peers.add(peer_id)
@@ -153,7 +133,7 @@ function attach_handlers(socket: Socket, id: string) {
 
   socket.on('close', () => {
     connected_peers.delete(id)
-    console.log(`[${id}]: disconnected`)
+    console.log(`[${id}]: Disconnected`)
   })
 }
 
