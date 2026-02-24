@@ -6,6 +6,7 @@ import canonicalize from 'canonicalize'
 import { add_peer, get_peers } from './peers'
 
 
+
 async function connect(socket: Socket) {
     await send_message(socket, {
         type: 'hello',
@@ -106,13 +107,18 @@ function attach_handlers(socket: Socket, id: string) {
         case 'hello':
           console.log(`[${id}]: Received hello message, connecting to node with name ${message.agent} and version ${message.version}`)
           connected_peers.add(id)
+          if(!discovered_peers.has(id)){
+            discovered_peers.add(id)
+            add_peer(id)
+          }
+
           break
 
         case 'getpeers':
            console.log(`[${id}]: Requested peers, sending discovered peers`) 
           send_message(socket, {
             type: 'peers',
-            peers: Array.from(discovered_peers)
+            peers: Array.from(discovered_peers).concat(SERVER_ID)
           } as Message)
           break
 
@@ -127,7 +133,7 @@ function attach_handlers(socket: Socket, id: string) {
           break
 
         case 'error':
-          console.log(`[${id}]: Recieved` + message.name + ' error message: ' + message.description+ ' '+ message.description)  
+          console.log(`[${id}]: Recieved error: ${message.name} - ${message.description}`)  
           break
       }
     }
@@ -146,7 +152,7 @@ function attach_handlers(socket: Socket, id: string) {
 }
 
 
-const SERVER_ID = '127.0.0.1:18018'
+const SERVER_ID = '95.179.176.219:18018'
 const PORT = 18018
 const NAME = 'TO_BE_DECIDED'
 const VERSION = '0.10.0'
