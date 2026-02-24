@@ -1,12 +1,12 @@
 import z from 'zod'
 
-export const HelloMessageSchema = z.object({
+export const HelloMessageSchema = z.strictObject({
     type: z.literal('hello'),
-    version: z.string(),  // TODO: regex for correct version
+    version: z.string().regex(/^0\.10\.[0-9]+$/),
     agent: z.optional(z.string().max(128))
 })
 
-export const ErrorMessageSchema = z.object({
+export const ErrorMessageSchema = z.strictObject({
     type: z.literal('error'),
     name: z.literal([
       'INTERNAL_ERROR',
@@ -24,13 +24,24 @@ export const ErrorMessageSchema = z.object({
       description: z.string()
 })
 
-export const GetPeersMessageSchema = z.object({
+export const GetPeersMessageSchema = z.strictObject({
     type: z.literal('getpeers')
 })
 
-export const PeersMessageSchema = z.object({
+export const PeersMessageSchema = z.strictObject({
     type: z.literal('peers'),
-    peers: z.array(z.string())  // TODO: regex for dns, IPv4 or IPv6
+    peers: z.array(z.union([z.hostname(),z.ipv4(),z.ipv6(), z.string().refine(
+        (str) => {
+            if(!str.includes(':')) return false
+            
+            let n = str.lastIndexOf(':')
+            let hostname = str.substring(0,n)
+            if (hostname[0] == '[' && hostname[n-1] == ']') hostname = str.substring(1,n-1)
+            let port = str.substring(n + 1);
+            
+            return z.union([z.hostname(),z.ipv4(),z.ipv6()]).safeParse(hostname).success && z.int().max(65535).safeParse(port).success
+        }
+        )]))
 })
 
 export const MessageSchema = z.discriminatedUnion('type', [
