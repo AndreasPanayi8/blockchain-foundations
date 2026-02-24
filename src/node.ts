@@ -57,13 +57,18 @@ function attach_handlers(socket: Socket, id: string) {
 
     const messages = buffer.split('\n')
     while (messages.length > 1) {
-      const raw = messages.shift()
-      if (raw === undefined) return
+      const msg = messages.shift()
+      if (msg === undefined){
+          console.error(`[${id}]: Error defragmenting messages`)
+          return}
+      
+          
 
-      let message: any
+      let message
       try {
-        message = JSON.parse(raw)
-      } catch {
+        message = JSON.parse(msg)
+      } catch (err) {
+        console.error(`[${id}]: Error parsing message as JSON`, msg)
         send_message(socket, {
           type: 'error',
           name: 'INVALID_FORMAT',
@@ -75,7 +80,8 @@ function attach_handlers(socket: Socket, id: string) {
 
       try {
         message = MessageSchema.parse(message)
-      } catch {
+      } catch(err) {
+        console.error(`[${id}]: Unknown protocol message`, message)
         send_message(socket, {
           type: 'error',
           name: 'INVALID_FORMAT',
@@ -86,10 +92,11 @@ function attach_handlers(socket: Socket, id: string) {
       }
 
       if (!connected_peers.has(id) && message.type !== 'hello') {
+        console.error(`[${id}]: Invalid handshake, expected hello message first`)
         send_message(socket, {
           type: 'error',
           name: 'INVALID_HANDSHAKE',
-          description: 'Did not receive hello message first'
+          description: 'Did not receive hello message'
         } as Message)
         socket.end()
         return
@@ -120,6 +127,7 @@ function attach_handlers(socket: Socket, id: string) {
           break
 
         case 'error':
+          console.log(`[${id}]: Recieved` + message.name + ' error message: ' + message.description+ ' '+ message.description)  
           break
       }
     }
