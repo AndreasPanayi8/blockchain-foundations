@@ -35,11 +35,14 @@ export const PeersMessageSchema = z.strictObject({
             if(!str.includes(':')) return false
             
             let n = str.lastIndexOf(':')
-            let hostname = str.substring(0,n)
-            if (hostname[0] == '[' && hostname[n-1] == ']') hostname = str.substring(1,n-1)
             let port = str.substring(n + 1);
             
-            return z.union([z.hostname(),z.ipv4(),z.ipv6()]).safeParse(hostname).success && z.int().max(65535).safeParse(port).success
+            if (str[0] == '[' && str[n-1] == ']') {
+                let hostname = str.substring(1,n-1)
+                return z.ipv6().safeParse(hostname).success && z.int().max(65535).safeParse(port).success
+            }
+            let hostname = str.substring(0,n)
+            return z.union([z.hostname(),z.ipv4()]).safeParse(hostname).success && z.int().max(65535).safeParse(port).success
         }
         )]))
 })
