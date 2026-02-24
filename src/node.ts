@@ -163,8 +163,117 @@ const server = createServer(async (socket) => {
     const id = `${socket.remoteAddress}:${socket.remotePort}`
     console.log(`Client connected from ${id}`)
 
+<<<<<<< HEAD
    attach_handlers(socket, id)
    await connect(socket)
+=======
+    connect(socket)
+
+    let buffer = ''
+    socket.on('data', (data) => {
+        buffer += data
+
+        const messages = buffer.split('\n')
+        while (messages.length > 1) {
+            let msg = messages.shift()
+            if (msg === undefined) {
+                console.error('[${id}]: Error defragmenting messages')
+                return
+            }
+
+            let message
+            try {
+                message = JSON.parse(msg)
+            } catch (error) {
+                console.error('[${id}]: Error parsing message as JSON', message)
+                send_message(socket, {
+                    type: 'error',
+                    name: 'INVALID_FORMAT',
+                    description: 'Received invalid message that could not parse as json ' + message          
+                })
+                socket.end()
+                return
+            }
+
+            try {
+                message = MessageSchema.parse(message)
+            } catch (_) {
+                console.error('[${id}]: Unknown protocol message', message)
+                send_message(socket, {
+                    type: 'error',
+                    name: 'INVALID_FORMAT',
+                    description: 'Received invalid protocol message ' + message
+                })
+                socket.end()
+                return
+            }
+
+            if (!connected_peers.has(id) && message.type != 'hello') {
+                console.log('[${id}]: Invalid handshake')
+                send_message(socket, {
+                    type: 'error',
+                    name: 'INVALID_HANDSHAKE',
+                    description: 'Did not recieve hello message'
+                })
+                socket.end()
+                return
+            }
+
+            switch (message.type) {
+                case 'hello':
+                    console.log('[${id}]: Recieved hello message, connecting to node with name ' +  message.agent)
+                    connected_peers.add(id)
+                    if(!discovered_peers.has(id)) {
+                        discovered_peers.add(id)
+                        add_peer(id)
+                    }
+                    break
+                case 'error':
+                    console.log('[${id}]: Recieved ' +  message.name + ' ' + message.description)
+                    break
+                case 'getpeers':
+                    console.log('[${id}]: Requested peers, sending descovered peers')
+                    send_message(socket, {
+                        type: 'peers',
+                        peers: Array.from(discovered_peers).concat(SERVER_ID)
+                    }
+                    )
+                    break
+                case 'peers':
+                    console.log('[${id}]: Recieved peers, updating descovered peers')
+                    for (let peer_id of message.peers) {
+                        if(!discovered_peers.has(peer_id)) {
+                            discovered_peers.add(peer_id)
+                            add_peer(peer_id)
+                        }
+                    }
+                    break
+            }
+        }
+
+        if (messages[0] === undefined) {
+            console.error('Error in parsing messages')
+            send_message(socket, {
+                type: 'error',
+                name: 'INTERNAL_ERROR',
+                description: 'Error in parsing messages'
+            })
+            socket.end()
+            return
+        }
+
+        buffer = messages[0]
+    })
+
+    socket.on('error', (error) => {
+        console.error('[${id}]: Received error ${error}')
+    })
+
+    socket.on('close', () => {
+        connected_peers.delete(id)
+        console.log('[${id}]: Client disconnected')
+    })
+>>>>>>> main
 })
 
 async function connect_to_random_discovered_peer() {
