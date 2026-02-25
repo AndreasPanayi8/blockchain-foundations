@@ -1,7 +1,5 @@
-// import path from "path";
 import fs from "fs";
 
-// Question 2.1
 export const BOOTSTRAP_PEERS: string[] = [
   "95.179.158.137:18018",
   "95.179.132.22:18018",
