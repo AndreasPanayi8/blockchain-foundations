@@ -59,8 +59,36 @@ export const PeersMessageSchema = z.strictObject({
   peers: z.array(z.string().refine(isPeerString, "peer must be <host>:<port>")),
 });
 
-export const MessageSchema = z.discriminatedUnion('type', [
-    HelloMessageSchema, ErrorMessageSchema, GetPeersMessageSchema, PeersMessageSchema
-])
+
+const Hash32Schema = z.string().regex(/^[0-9a-f]{64}$/);
+
+export const GetMempoolMessageSchema = z.strictObject({
+  type: z.literal("getmempool"),
+});
+
+export const MempoolMessageSchema = z.strictObject({
+  type: z.literal("mempool"),
+  txids: z.array(Hash32Schema),
+});
+
+export const GetChainTipMessageSchema = z.strictObject({
+  type: z.literal("getchaintip"),
+});
+
+export const ChainTipMessageSchema = z.strictObject({
+  type: z.literal("chaintip"),
+  blockid: Hash32Schema,
+});
+
+export const MessageSchema = z.discriminatedUnion("type", [
+  HelloMessageSchema,
+  ErrorMessageSchema,
+  GetPeersMessageSchema,
+  PeersMessageSchema,
+  GetMempoolMessageSchema,
+  MempoolMessageSchema,
+  GetChainTipMessageSchema,
+  ChainTipMessageSchema,
+]);
 
 export type Message = z.infer<typeof MessageSchema>
