@@ -55,7 +55,7 @@ function checkForLocalhostIPv6(host: string): boolean {
   if (host === "::1") return false;
   if (host == "::") return false;
 
-  if (host.startsWith('fe00')) return false;
+  if (host.startsWith('fe80')) return false;
 
   return true;
 }
