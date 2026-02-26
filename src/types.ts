@@ -44,7 +44,7 @@ function isPeerString(s: string): boolean {
       && Number.isInteger(port) && port >= 1 && port <= 65535;
   }
 
-  // host:port (hostname or ipv4)
+  // host:port (dns or ipv4)
   const i = s.lastIndexOf(":");
   if (i <= 0) return false;
 

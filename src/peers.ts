@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 
 export const BOOTSTRAP_PEERS: string[] = [
   "95.179.158.137:18018",
@@ -8,22 +9,23 @@ export const BOOTSTRAP_PEERS: string[] = [
 
 const PEERS_FILE = "storage/discovered_peers.txt";
 
-// function ensurePeersFile(): void {
-//   const dir = path.dirname(PEERS_FILE);
+function ensurePeersFile(): void {
+  const dir = path.dirname(PEERS_FILE);
 
-//   // create storage/ if missing
-//   if (!fs.existsSync(dir)) {
-//     fs.mkdirSync(dir, { recursive: true });
-//   }
+  // create storage/ if missing
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 
-//   // create file if missing
-//   if (!fs.existsSync(PEERS_FILE)) {
-//     fs.writeFileSync(PEERS_FILE, "", "utf8");
-//   }
-// }
+  // create file if missing
+  if (!fs.existsSync(PEERS_FILE)) {
+    fs.writeFileSync(PEERS_FILE, "", "utf8");
+  }
+}
 
+// Returns a set of all known peers
 function get_peers(): Set<string> {
-  // ensurePeersFile();
+  ensurePeersFile();
 
   const peers = new Set<string>(BOOTSTRAP_PEERS);
   const contents = fs.readFileSync(PEERS_FILE, "utf8");
@@ -36,8 +38,9 @@ function get_peers(): Set<string> {
   return peers;
 }
 
+// Add a non already discovred peer to file
 function add_peer(peer: string): void {
-  // ensurePeersFile();
+  ensurePeersFile();
   fs.appendFileSync(PEERS_FILE, peer + "\n", "utf8");
 }
 

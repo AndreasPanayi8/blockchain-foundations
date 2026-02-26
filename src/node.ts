@@ -6,18 +6,11 @@ import canonicalize from 'canonicalize'
 import { add_peer, get_peers } from './peers'
 
 
+const PORT = 18018
+const SERVER_ID = '95.179.176.219:'+PORT
+const NAME = 'MMA'
+const VERSION = '0.10.0'
 
-async function connect(socket: Socket) {
-    await send_message(socket, {
-        type: 'hello',
-        version: VERSION,
-        agent: NAME
-    } as Message)
-
-    await send_message(socket, {
-        type: 'getpeers'
-    } as Message)
-}
 
 function parse_peer_address(peer: string): { host: string, port: number } | null {
     //[IPv6]:port
@@ -34,7 +27,7 @@ function parse_peer_address(peer: string): { host: string, port: number } | null
         return { host, port }
     }
 
-    //IPv4
+    //IPv4 or dns
     const idx = peer.lastIndexOf(':')
     if (idx <= 0) return null
     const host = peer.slice(0, idx).trim()
@@ -43,12 +36,26 @@ function parse_peer_address(peer: string): { host: string, port: number } | null
     return { host, port }
 }
 
-
+// Networking helper functions
     
 async function send_message(socket: Socket, msg: Message) {
     socket.write(canonicalize(msg) + '\n')
 }
 
+// Handshake
+async function connect(socket: Socket) {
+    await send_message(socket, {
+        type: 'hello',
+        version: VERSION,
+        agent: NAME
+    } as Message)
+
+    await send_message(socket, {
+        type: 'getpeers'
+    } as Message)
+}
+
+// Message handlers
 function attach_handlers(socket: Socket, id: string) {
   socket.setEncoding('utf8')  
   let buffer = ''
@@ -59,12 +66,14 @@ function attach_handlers(socket: Socket, id: string) {
     const messages = buffer.split('\n')
     while (messages.length > 1) {
       const msg = messages.shift()
+
+      // Error handling
+      
       if (msg === undefined){
           console.error(`[${id}]: Error defragmenting messages`)
           return}
-      
-          
 
+      // Parse JSON
       let message
       try {
         message = JSON.parse(msg)
@@ -78,7 +87,8 @@ function attach_handlers(socket: Socket, id: string) {
         socket.end()
         return
       }
-
+      
+      // Check protocol schema
       try {
         message = MessageSchema.parse(message)
       } catch(err) {
@@ -92,6 +102,7 @@ function attach_handlers(socket: Socket, id: string) {
         return
       }
 
+      // Check handshake
       if (!connected_peers.has(id) && message.type !== 'hello') {
         console.error(`[${id}]: Invalid handshake, expected hello message first`)
         send_message(socket, {
@@ -102,6 +113,8 @@ function attach_handlers(socket: Socket, id: string) {
         socket.end()
         return
       }
+
+      // Valid message
 
       switch (message.type) {
         case 'hello':
@@ -152,11 +165,6 @@ function attach_handlers(socket: Socket, id: string) {
 }
 
 
-const SERVER_ID = '95.179.176.219:18018'
-const PORT = 18018
-const NAME = 'MMA'
-const VERSION = '0.10.0'
-
 let discovered_peers = get_peers()
 let connected_peers = new Set<string>()
 const server = createServer(async (socket) => {
@@ -174,6 +182,7 @@ async function connect_to_random_discovered_peer() {
         return
     }
     
+    // Pick random peer
     const peer = peersArr[Math.floor(Math.random() * peersArr.length)]
     if (!peer) return
     
@@ -199,10 +208,9 @@ async function connect_to_random_discovered_peer() {
         console.error(`Error connecting to peer ${peer}:`, err)
     })
     
-}
+  }
 
-
-
+// Start the server
 server.listen(PORT, async() => {
     console.log(`Server listening on port ${PORT}`)
     await connect_to_random_discovered_peer()
