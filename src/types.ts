@@ -1,4 +1,4 @@
-import z from 'zod'
+import z, { object } from 'zod'
 
 export const HelloMessageSchema = z.strictObject({
     type: z.literal('hello'),
@@ -29,6 +29,32 @@ export const GetPeersMessageSchema = z.strictObject({
     type: z.literal('getpeers')
 })
 
+// Returns true if host is not localhost
+function checkForLocalhostIPv4DNS(host: string): boolean {
+  if (host === "localhost") return false;
+
+  const octets = host.split(".").map(o => Number(o));
+
+  if (octets[0] == 10) return false;
+  
+  if (octets[0] === 172 && (octets[1] === undefined || octets[1] >= 16 || octets[1] <= 31)) return false
+
+  if (octets[0] === 192 && octets[1] === 168) return false
+
+  return true;
+}
+
+// Returns true if host is not localhost
+function checkForLocalhostIPv6(host: string): boolean {
+  if (host === "localhost") return false;
+
+  const octets = host.split(":").map(o => Number("0x" + o));
+
+  if (octets[0] === undefined || (octets[0] >= 0xfe80 && octets[0] <= 0xfebf)) return false
+
+  return true;
+}
+
 function isPeerString(s: string): boolean {
   // [IPv6]:port
   if (s.startsWith("[")) {
@@ -36,6 +62,7 @@ function isPeerString(s: string): boolean {
     if (close < 0) return false;
 
     const host = s.slice(1, close);
+    if (!checkForLocalhostIPv6(host)) return false
     const rest = s.slice(close + 1);
     if (!rest.startsWith(":")) return false;
 
@@ -49,6 +76,8 @@ function isPeerString(s: string): boolean {
   if (i <= 0) return false;
 
   const host = s.slice(0, i);
+  if (checkForLocalhostIPv4DNS(host)) return false;
+  
   const port = Number(s.slice(i + 1));
   return z.union([z.hostname(), z.ipv4()]).safeParse(host).success
     && Number.isInteger(port) && port >= 1 && port <= 65535;
