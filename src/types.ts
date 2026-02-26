@@ -35,22 +35,27 @@ function checkForLocalhostIPv4DNS(host: string): boolean {
 
   const octets = host.split(".").map(o => Number(o));
 
+  if (octets[0] == 0) return false;
+  
   if (octets[0] == 10) return false;
   
-  if (octets[0] === 172 && (octets[1] === undefined || octets[1] >= 16 || octets[1] <= 31)) return false
+  if (octets[0] == 127) return false;
+  
+  if (octets[0] === 169 && octets[1] === 254) return false;
+  
+  if (octets[0] === 172 && (octets[1] === undefined || octets[1] >= 16 && octets[1] <= 31)) return false;
 
-  if (octets[0] === 192 && octets[1] === 168) return false
+  if (octets[0] === 192 && octets[1] === 168) return false;
 
   return true;
 }
 
 // Returns true if host is not localhost
 function checkForLocalhostIPv6(host: string): boolean {
-  if (host === "localhost") return false;
+  if (host === "::1") return false;
+  if (host == "::") return false;
 
-  const octets = host.split(":").map(o => Number("0x" + o));
-
-  if (octets[0] === undefined || (octets[0] >= 0xfe80 && octets[0] <= 0xfebf)) return false
+  if (host.startsWith('fe00')) return false;
 
   return true;
 }
@@ -76,7 +81,7 @@ function isPeerString(s: string): boolean {
   if (i <= 0) return false;
 
   const host = s.slice(0, i);
-  if (checkForLocalhostIPv4DNS(host)) return false;
+  if (!checkForLocalhostIPv4DNS(host)) return false;
   
   const port = Number(s.slice(i + 1));
   return z.union([z.hostname(), z.ipv4()]).safeParse(host).success
