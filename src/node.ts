@@ -9,7 +9,7 @@ import { add_peer, get_peers } from './peers'
 const PORT = 18018
 const SERVER_ID = '95.179.176.219:'+PORT
 const NAME = 'MMA'
-const VERSION = '0.10.0'
+const VERSION = '0.10.1'
 
 
 function parse_peer_address(peer: string): { host: string, port: number } | null {
