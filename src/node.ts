@@ -1,9 +1,11 @@
-
 import { Socket, createServer } from 'net'
-
 import { type Message, MessageSchema  } from './types'
 import canonicalize from 'canonicalize'
 import { add_peer, get_peers } from './peers'
+import { objectManager } from './object'
+import type { NetworkObject } from './types'
+import { object } from 'zod'
+import { ca } from 'zod/locales'
 
 
 const PORT = 18018
@@ -42,6 +44,38 @@ async function send_message(socket: Socket, msg: Message) {
     socket.write(canonicalize(msg) + '\n')
 }
 
+async function send_getobject(socket: Socket, objectid: string) {
+    await send_message(socket, {
+        type: 'getobject',
+        objectid
+    } as Message);
+}
+
+async function send_ihaveobject(socket: Socket, objectid: string) {
+    await send_message(socket, {
+        type: 'ihaveobject',
+        objectid
+    } as Message);
+}
+
+async function send_object(socket: Socket, object: NetworkObject) {
+    await send_message(socket, {
+        type: 'object',
+        object
+    } as Message);
+}
+
+async function broadcast_ihaveobject(exceptPeerId: string, objectid: string) {
+    for (const [peerId, sock] of peerSockets.entries()) {
+        if (peerId === exceptPeerId) continue;
+        if (sock.destroyed) continue; 
+        await send_ihaveobject(sock, objectid);
+    }
+  }
+
+
+
+
 // Handshake
 async function connect(socket: Socket) {
     await send_message(socket, {
@@ -60,7 +94,7 @@ function attach_handlers(socket: Socket, id: string) {
   socket.setEncoding('utf8')  
   let buffer = ''
 
-  socket.on('data', (data) => {
+  socket.on('data', async (data) => {
     buffer += data
 
     const messages = buffer.split('\n')
@@ -120,6 +154,7 @@ function attach_handlers(socket: Socket, id: string) {
         case 'hello':
           console.log(`[${id}]: Received hello message, connecting to node with name ${message.agent} and version ${message.version}`)
           connected_peers.add(id)
+          peerSockets.set(id, socket)
           if(!discovered_peers.has(id)){
             discovered_peers.add(id)
             add_peer(id)
@@ -145,6 +180,64 @@ function attach_handlers(socket: Socket, id: string) {
           }
           break
 
+        // objects exchange and gossiping
+
+        case 'ihaveobject': {
+          const objectid = message.objectid;
+          const known = await objectManager.exists(objectid);
+          if (!known) {
+            console.log(`[${id}]: ihaveobject &{objectid} -> requesting object`);
+            await send_getobject(socket, objectid);
+          } else {
+            console.log(`[${id}]: ihaveobject &{objectid} -> already known, not requesting`);
+          }
+          break;
+        }
+
+        case 'getobject': {
+          const objectid = message.objectid;
+          const known = await objectManager.exists(objectid);
+          if (!known) {
+            // Spec says "send if you have it". If not, do nothing or send error
+            console.log(`[${id}]: getobject &{objectid} -> not found`);
+            await send_message(socket, {
+              type: 'error',
+              name: 'UNKNOWN_OBJECT',
+              description: `Object ${objectid} not found`
+            } as Message);
+            break;
+          }
+
+          const obj = await objectManager.get(objectid);
+          console.log(`[${id}]: getobject &{objectid} -> sending object`);
+          await send_object(socket, obj);
+          break;
+        }
+
+        case 'object': {
+          const obj = message.object;
+
+          const objectid = objectManager.objectId(obj);
+
+          const known = await objectManager.exists(objectid);
+          if (known) {
+            console.log(`[${id}]: object ${objectid} -> already stored, ignoring`);
+            break;
+          }
+
+          // Store object
+          await objectManager.put(obj);
+          console.log(`[${id}]: stored new object ${objectid}`);
+
+          //Gossip
+          await broadcast_ihaveobject(id, objectid);
+
+          break;
+        }
+        
+      //end of object exchange and gossiping
+
+
         case 'error':
           console.log(`[${id}]: Recieved error: ${message.name} - ${message.description}`)  
           break
@@ -160,13 +253,16 @@ function attach_handlers(socket: Socket, id: string) {
 
   socket.on('close', () => {
     connected_peers.delete(id)
+    peerSockets.delete(id)
     console.log(`[${id}]: Disconnected`)
   })
 }
 
 
-let discovered_peers = get_peers()
-let connected_peers = new Set<string>()
+let discovered_peers = get_peers();
+let connected_peers = new Set<string>();
+const peerSockets = new Map<string, Socket>();
+
 const server = createServer(async (socket) => {
     const id = `${socket.remoteAddress}:${socket.remotePort}`
     console.log(`Client connected from ${id}`)

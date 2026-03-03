@@ -96,6 +96,26 @@ export const PeersMessageSchema = z.strictObject({
 
 const Hash32Schema = z.string().regex(/^[0-9a-f]{64}$/);
 
+export const NetworkObjectSchema = z.strictObject({
+   name: z.string(),
+   deps: z.array(Hash32Schema)
+})
+
+export const GetObjectMessageSchema = z.strictObject({
+  type: z.literal("getobject"),
+  objectid: Hash32Schema,
+});
+
+export const IHaveObjectMessageSchema = z.strictObject({
+  type: z.literal("ihaveobject"),
+  objectid: Hash32Schema,
+});
+
+export const ObjectMessageSchema = z.strictObject({
+  type: z.literal("object"),
+  object: NetworkObjectSchema,
+});
+
 export const GetMempoolMessageSchema = z.strictObject({
   type: z.literal("getmempool"),
 });
@@ -117,12 +137,24 @@ export const ChainTipMessageSchema = z.strictObject({
 export const MessageSchema = z.discriminatedUnion("type", [
   HelloMessageSchema,
   ErrorMessageSchema,
+
   GetPeersMessageSchema,
   PeersMessageSchema,
+
+  // object exchange
+  GetObjectMessageSchema,
+  IHaveObjectMessageSchema,
+  ObjectMessageSchema,
+
   GetMempoolMessageSchema,
   MempoolMessageSchema,
   GetChainTipMessageSchema,
   ChainTipMessageSchema,
 ]);
 
+
 export type Message = z.infer<typeof MessageSchema>
+export type NetworkObject = z.infer<typeof NetworkObjectSchema>;
+export type GetObjectMessage = z.infer<typeof GetObjectMessageSchema>;
+export type IHaveObjectMessage = z.infer<typeof IHaveObjectMessageSchema>;
+export type ObjectMessage = z.infer<typeof ObjectMessageSchema>;
