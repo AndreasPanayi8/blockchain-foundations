@@ -41,11 +41,11 @@ function parse_peer_address(peer: string): { host: string, port: number } | null
 // Networking helper functions
     
 async function send_message(socket: Socket, msg: Message) {
-    socket.write(canonicalize(msg) + '\n')
+  socket.write(canonicalize(msg) + '\n')
 }
 
 async function send_getobject(socket: Socket, objectid: string) {
-    await send_message(socket, {
+  await send_message(socket, {
         type: 'getobject',
         objectid
     } as Message);
@@ -56,6 +56,12 @@ async function send_ihaveobject(socket: Socket, objectid: string) {
         type: 'ihaveobject',
         objectid
     } as Message);
+}
+
+function request_object_from_network(objectid: string) {
+  for (const sock of peerSockets.values()) {
+    if (!sock.destroyed) send_getobject(sock, objectid);
+  }
 }
 
 async function send_object(socket: Socket, object: NetworkObject) {
@@ -94,7 +100,7 @@ function attach_handlers(socket: Socket, id: string) {
   socket.setEncoding('utf8')  
   let buffer = ''
 
-  socket.on('data', async (data) => {
+  socket.on('data', (data) => {
     buffer += data
 
     const messages = buffer.split('\n')
@@ -184,33 +190,31 @@ function attach_handlers(socket: Socket, id: string) {
 
         case 'ihaveobject': {
           const objectid = message.objectid;
-          const known = await objectManager.exists(objectid);
-          if (!known) {
-            console.log(`[${id}]: ihaveobject &{objectid} -> requesting object`);
-            await send_getobject(socket, objectid);
-          } else {
-            console.log(`[${id}]: ihaveobject &{objectid} -> already known, not requesting`);
-          }
+          objectManager.exists(objectid).then((known) => {
+            if (!known) send_getobject(socket, objectid);
+          }).catch((err) => {
+            console.error(`[${id}]: exists failed`, err)
+          })
           break;
         }
 
         case 'getobject': {
           const objectid = message.objectid;
-          const known = await objectManager.exists(objectid);
-          if (!known) {
-            // Spec says "send if you have it". If not, do nothing or send error
-            console.log(`[${id}]: getobject &{objectid} -> not found`);
-            await send_message(socket, {
-              type: 'error',
-              name: 'UNKNOWN_OBJECT',
-              description: `Object ${objectid} not found`
-            } as Message);
-            break;
-          }
-
-          const obj = await objectManager.get(objectid);
-          console.log(`[${id}]: getobject &{objectid} -> sending object`);
-          await send_object(socket, obj);
+          objectManager.exists(objectid).then((known) => {
+            if (!known) {
+              send_message(socket, {
+                type: 'error',
+                name: 'UNKNOWN_OBJECT',
+                description: `Object ${objectid} not found`
+              } as Message);
+              return;
+            }
+            return objectManager.get(objectid).then((obj) => {
+              send_object(socket, obj);
+            });
+          }).catch((err) => {
+            console.error(`[${id}]: get failed`, err);
+          });
           break;
         }
 
@@ -219,18 +223,14 @@ function attach_handlers(socket: Socket, id: string) {
 
           const objectid = objectManager.objectId(obj);
 
-          const known = await objectManager.exists(objectid);
-          if (known) {
-            console.log(`[${id}]: object ${objectid} -> already stored, ignoring`);
-            break;
-          }
-
-          // Store object
-          await objectManager.put(obj);
-          console.log(`[${id}]: stored new object ${objectid}`);
-
-          //Gossip
-          await broadcast_ihaveobject(id, objectid);
+          objectManager.exists(objectid).then((known) => {
+            if (known) return;
+            return objectManager.put(obj).then(() => {
+              broadcast_ihaveobject(id, objectid);
+            });
+          }).catch((err) => {
+            console.error(`[${id}]: object store failed`, err);
+          });
 
           break;
         }

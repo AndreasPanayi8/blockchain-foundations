@@ -35,7 +35,12 @@ export class ObjectManager{
 
     async get(objectid: string): Promise<NetworkObject>{
         //Level throws if missing
-        return await this.db.get(objectid);
+        try{
+            return await this.db.get(objectid);
+        } catch {
+            throw new Error(`Object ${objectid} not found`);
+        }
+        
     }
 
     async put(object: NetworkObject): Promise<string>{
@@ -66,7 +71,7 @@ export class ObjectManager{
 
         //Wait for it or timeout
         return await new Promise<NetworkObject>((resolve, reject) => {
-      const timer = setTimeout(() => {
+        const timer = setTimeout(() => {
         const arr = this.pending.get(objectid);
         if (arr) {
           const idx = arr.findIndex((w) => w.resolve === resolve);
