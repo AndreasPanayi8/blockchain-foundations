@@ -96,10 +96,24 @@ export const PeersMessageSchema = z.strictObject({
 
 const Hash32Schema = z.string().regex(/^[0-9a-f]{64}$/);
 
-export const NetworkObjectSchema = z.strictObject({
-   name: z.string(),
-   deps: z.array(Hash32Schema)
+export const TransactionSchema = z.strictObject({
+  type: z.literal('transaction'),
+  inputs: z.array(z.strictObject({
+    outpoint: z.strictObject({
+      txid: z.string(),
+      index: z.int()
+    }),
+    sig: z.string() 
+  })),
+  outputs: z.array(z.strictObject({
+    pubkey: z.string(),
+    value: z.int()
+  }))
 })
+
+export const NetworkObjectSchema = z.discriminatedUnion("type", [
+  TransactionSchema
+])
 
 export const GetObjectMessageSchema = z.strictObject({
   type: z.literal("getobject"),

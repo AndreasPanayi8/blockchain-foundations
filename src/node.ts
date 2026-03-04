@@ -3,9 +3,9 @@ import { type Message, MessageSchema  } from './types'
 import canonicalize from 'canonicalize'
 import { add_peer, get_peers } from './peers'
 import { objectManager } from './object'
-import type { NetworkObject } from './types'
-import { object } from 'zod'
-import { ca } from 'zod/locales'
+
+import { verifyAsync } from '@noble/ed25519'
+import { utf8ToBytes } from '@noble/hashes/utils.js'
 
 
 const PORT = 18018
@@ -206,18 +206,77 @@ function attach_handlers(socket: Socket, id: string) {
 
           objectManager.exists(objectid).then((known) => {
             if (known) return;
-            return objectManager.put(obj).then(() => {
+
+            switch (obj.type) {
+              case 'transaction':
+                const unsigned = {
+                  type: obj.type,
+                  inputs: obj.inputs.map(({outpoint,sig}) => {outpoint}),
+                  outputs: obj.outputs
+                }
+
+                const canonicalized = canonicalize(unsigned);
+                if (!canonicalized) {
+                  console.log("Failed to canonicalize unsigned transaction");
+                  return;
+                }
+
+                var inputSum = 0;
+                for (const input of obj.inputs) {
+                  const txid = input.outpoint.txid;
+                  const found = objectManager.exists(txid);
+                  if(!found) {
+                    send_message(socket, {
+                      type: 'error',
+                      name: 'INVALID_FORMAT',
+                      description: 'Transaction txid not found in database'
+                    });
+                  }
+
+                  objectManager.get(txid).then(inTransaction => {
+                    for (const o of inTransaction.outputs)  {
+                      inputSum += o.value; 
+                    }
+                  }).catch (err => 
+                    console.error(`[${id}]: get failed`, err)
+                  );
+
+                  if (!verifyAsync(utf8ToBytes(input.sig),utf8ToBytes(canonicalized),utf8ToBytes(obj.outputs[input.outpoint.index].pubkey))) {
+                    send_message(socket, {
+                      type: 'error',
+                      name: 'INVALID_TX_SIGNATURE',
+                      description: 'Invalid signature'
+                    });
+                    return;
+                  }
+                }
+
+                var outputSum = 0;
+                for (const o of obj.outputs) {
+                  outputSum += o.value;
+                }
+
+                if (inputSum < outputSum) {
+                  send_message(socket, {
+                    type: 'error',
+                    name: 'INVALID_TX_CONSERVATION',
+                    description: 'The sum of the outputs is higher than the sum of the inputs'
+                  });
+                  return;
+                }
+                break;
+            }
+
+
+            objectManager.put(obj).then(() => {
                 broadcast_ihaveobject(id, objectid);
-              });
-            }).catch((err) => {
+              }).catch((err) => {
               console.error(`[${id}]: object store failed`, err);
-            });
+            })
+          });
 
           break;
         }
-        
-      //end of object exchange and gossiping
-
 
         case 'error':
           console.log(`[${id}]: Recieved error: ${message.name} - ${message.description}`)  
