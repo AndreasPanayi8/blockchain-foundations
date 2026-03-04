@@ -44,43 +44,16 @@ async function send_message(socket: Socket, msg: Message) {
   socket.write(canonicalize(msg) + '\n')
 }
 
-async function send_getobject(socket: Socket, objectid: string) {
-  await send_message(socket, {
-        type: 'getobject',
-        objectid
-    } as Message);
-}
-
-async function send_ihaveobject(socket: Socket, objectid: string) {
-    await send_message(socket, {
-        type: 'ihaveobject',
-        objectid
-    } as Message);
-}
-
-function request_object_from_network(objectid: string) {
-  for (const sock of peerSockets.values()) {
-    if (!sock.destroyed) send_getobject(sock, objectid);
-  }
-}
-
-async function send_object(socket: Socket, object: NetworkObject) {
-    await send_message(socket, {
-        type: 'object',
-        object
-    } as Message);
-}
-
 async function broadcast_ihaveobject(exceptPeerId: string, objectid: string) {
     for (const [peerId, sock] of peerSockets.entries()) {
         if (peerId === exceptPeerId) continue;
         if (sock.destroyed) continue; 
-        await send_ihaveobject(sock, objectid);
+        await send_message(sock, {
+            type: 'ihaveobject',
+            objectid
+        } as Message);
     }
   }
-
-
-
 
 // Handshake
 async function connect(socket: Socket) {
@@ -190,8 +163,13 @@ function attach_handlers(socket: Socket, id: string) {
 
         case 'ihaveobject': {
           const objectid = message.objectid;
-          objectManager.exists(objectid).then((known) => {
-            if (!known) send_getobject(socket, objectid);
+          objectManager.exists(objectid).then((known) =>  {
+            if (!known) {
+              send_message(socket, {
+                  type: 'getobject',
+                  objectid
+              } as Message);
+            }
           }).catch((err) => {
             console.error(`[${id}]: exists failed`, err)
           })
@@ -201,17 +179,20 @@ function attach_handlers(socket: Socket, id: string) {
         case 'getobject': {
           const objectid = message.objectid;
           objectManager.exists(objectid).then((known) => {
-            if (!known) {
-              send_message(socket, {
-                type: 'error',
-                name: 'UNKNOWN_OBJECT',
-                description: `Object ${objectid} not found`
-              } as Message);
-              return;
-            }
-            return objectManager.get(objectid).then((obj) => {
-              send_object(socket, obj);
-            });
+          if (!known) {
+            send_message(socket, {
+              type: 'error',
+              name: 'UNKNOWN_OBJECT',
+              description: `Object ${objectid} not found`
+            } as Message);
+            return;
+          }
+          return objectManager.get(objectid).then((obj) => {
+            send_message(socket, {
+                type: 'object',
+                object: obj
+            } as Message);
+          });
           }).catch((err) => {
             console.error(`[${id}]: get failed`, err);
           });
@@ -226,11 +207,11 @@ function attach_handlers(socket: Socket, id: string) {
           objectManager.exists(objectid).then((known) => {
             if (known) return;
             return objectManager.put(obj).then(() => {
-              broadcast_ihaveobject(id, objectid);
+                broadcast_ihaveobject(id, objectid);
+              });
+            }).catch((err) => {
+              console.error(`[${id}]: object store failed`, err);
             });
-          }).catch((err) => {
-            console.error(`[${id}]: object store failed`, err);
-          });
 
           break;
         }
