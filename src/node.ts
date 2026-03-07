@@ -68,6 +68,180 @@ async function connect(socket: Socket) {
     } as Message)
 }
 
+async function handle_message(socket: Socket, id: string, message: Message) {
+  switch (message.type) {
+    case 'getpeers':
+        console.log(`[${id}]: Requested peers, sending discovered peers`) 
+      send_message(socket, {
+        type: 'peers',
+        peers: Array.from(discovered_peers).concat(SERVER_ID)
+      } as Message)
+      break
+
+    case 'peers':
+      console.log(`[${id}]: Received peers, updating discovered peers`)
+      for (const peer_id of message.peers) {
+        if (!discovered_peers.has(peer_id)) {
+          discovered_peers.add(peer_id)
+          add_peer(peer_id)
+        }
+      }
+      break
+
+    // objects exchange and gossiping
+
+    case 'ihaveobject': 
+      const objectid = message.objectid;
+      
+      try { 
+        const known = await objectManager.exists(objectid);
+        if (!known) {
+          send_message(socket, {
+              type: 'getobject',
+              objectid
+          } as Message);
+        }
+      } catch (err) {
+        console.error(`[${id}]: exists failed`, err);
+      }
+      break;
+
+    case 'getobject': {
+      const objectid = message.objectid;
+      
+      const known = await objectManager.exists(objectid);
+      if (!known) {
+        send_message(socket, {
+          type: 'error',
+          name: 'UNKNOWN_OBJECT',
+          description: `Object ${objectid} not found`
+        } as Message);
+      }
+      
+      try {
+        const obj = await objectManager.get(objectid);
+        send_message(socket, {
+            type: 'object',
+            object: obj
+        } as Message);
+        
+      } catch(err)  {
+        console.error(`[${id}]: get failed`, err);
+      }
+      break;
+    }
+
+    case 'object': {
+      const obj = message.object;
+
+      const objectid = objectManager.objectId(obj);
+
+      const known = await objectManager.exists(objectid);
+      if (known) return;
+
+      switch (obj.type) {
+        case 'transaction':
+          console.log("Recieved transaction");
+
+          const unsigned = {
+            type: obj.type,
+            inputs: obj.inputs.map(({outpoint,sig}) => {outpoint}),
+            outputs: obj.outputs
+          }
+
+          const canonicalized = canonicalize(unsigned);
+          if (!canonicalized) {
+            console.log("Failed to canonicalize unsigned transaction");
+            return;
+          }
+
+          var inputSum = 0;
+          for (const input of obj.inputs) {
+            const txid = input.outpoint.txid;
+            const found = objectManager.exists(txid);
+            if(!found) {
+              send_message(socket, {
+                type: 'error',
+                name: 'INVALID_FORMAT',
+                description: 'Transaction txid not found in database'
+              });
+            }
+
+            try {
+              const inTransaction = await objectManager.get(txid);
+            for (const o of inTransaction.outputs)  {
+              inputSum += o.value; 
+            }
+            } catch (err) { 
+              console.error(`[${id}]: get failed`, err);
+            }
+
+            if (input.outpoint.index >= obj.outputs.length) {
+              console.error(`[${id}]: Too large transaction outpoint index`);
+              send_message(socket, {
+                type: 'error',
+                name: 'INVALID_TX_OUTPOINT',
+                description: 'The transaction outpoint index is too large'
+              });
+              return;
+            }
+            
+            const output = obj.outputs[input.outpoint.index];
+            if (output !== undefined) {
+              const verify = await verifyAsync(utf8ToBytes(input.sig),utf8ToBytes(canonicalized),utf8ToBytes(output.pubkey)); 
+              if (!verify) {
+                console.error(`[${id}]: Invalid TX signature`);
+                send_message(socket, {
+                  type: 'error',
+                  name: 'INVALID_TX_SIGNATURE',
+                  description: 'Invalid signature'
+                });
+                return;
+              }
+            } else {
+                console.error(`[${id}]: Output object is undefined`);
+                send_message(socket, {
+                type: 'error',
+                name: 'INVALID_FORMAT',
+                description: 'Output object is undefined'
+              });
+              return;
+            }
+          }
+
+          var outputSum = 0;
+          for (const o of obj.outputs) {
+            outputSum += o.value;
+          }
+
+          if (inputSum < outputSum) {
+            console.error(`[${id}]: Weak law of conservation is not satisfied`);
+            send_message(socket, {
+              type: 'error',
+              name: 'INVALID_TX_CONSERVATION',
+              description: 'The transaction does not satisfy the weak law of conservation'
+            });
+            return;
+          }
+          break;
+        }
+
+        try {
+          await objectManager.put(obj)
+          broadcast_ihaveobject(id, objectid);
+        } catch(err) {
+          console.error(`[${id}]: object store failed`, err);
+        }
+
+      break;
+    }
+
+    case 'error':
+      console.log(`[${id}]: Recieved error: ${message.name} - ${message.description}`)  
+      break
+  }
+}
+
 // Message handlers
 function attach_handlers(socket: Socket, id: string) {
   socket.setEncoding('utf8')  
@@ -128,160 +302,19 @@ function attach_handlers(socket: Socket, id: string) {
       }
 
       // Valid message
-
-      switch (message.type) {
-        case 'hello':
-          console.log(`[${id}]: Received hello message, connecting to node with name ${message.agent} and version ${message.version}`)
-          connected_peers.add(id)
-          peerSockets.set(id, socket)
-          if(!discovered_peers.has(id)){
-            discovered_peers.add(id)
-            add_peer(id)
-          }
-
-          break
-
-        case 'getpeers':
-           console.log(`[${id}]: Requested peers, sending discovered peers`) 
-          send_message(socket, {
-            type: 'peers',
-            peers: Array.from(discovered_peers).concat(SERVER_ID)
-          } as Message)
-          break
-
-        case 'peers':
-          console.log(`[${id}]: Received peers, updating discovered peers`)
-          for (const peer_id of message.peers) {
-            if (!discovered_peers.has(peer_id)) {
-              discovered_peers.add(peer_id)
-              add_peer(peer_id)
-            }
-          }
-          break
-
-        // objects exchange and gossiping
-
-        case 'ihaveobject': {
-          const objectid = message.objectid;
-          objectManager.exists(objectid).then((known) =>  {
-            if (!known) {
-              send_message(socket, {
-                  type: 'getobject',
-                  objectid
-              } as Message);
-            }
-          }).catch((err) => {
-            console.error(`[${id}]: exists failed`, err)
-          })
-          break;
+      if (message.type === 'hello') {
+        console.log(`[${id}]: Received hello message, connecting to node with name ${message.agent} and version ${message.version}`)
+        connected_peers.add(id)
+        peerSockets.set(id, socket)
+        if(!discovered_peers.has(id)){
+          discovered_peers.add(id)
+          add_peer(id)
         }
-
-        case 'getobject': {
-          const objectid = message.objectid;
-          objectManager.exists(objectid).then((known) => {
-          if (!known) {
-            send_message(socket, {
-              type: 'error',
-              name: 'UNKNOWN_OBJECT',
-              description: `Object ${objectid} not found`
-            } as Message);
-            return;
-          }
-          return objectManager.get(objectid).then((obj) => {
-            send_message(socket, {
-                type: 'object',
-                object: obj
-            } as Message);
-          });
-          }).catch((err) => {
-            console.error(`[${id}]: get failed`, err);
-          });
-          break;
-        }
-
-        case 'object': {
-          const obj = message.object;
-
-          const objectid = objectManager.objectId(obj);
-
-          objectManager.exists(objectid).then((known) => {
-            if (known) return;
-
-            switch (obj.type) {
-              case 'transaction':
-                const unsigned = {
-                  type: obj.type,
-                  inputs: obj.inputs.map(({outpoint,sig}) => {outpoint}),
-                  outputs: obj.outputs
-                }
-
-                const canonicalized = canonicalize(unsigned);
-                if (!canonicalized) {
-                  console.log("Failed to canonicalize unsigned transaction");
-                  return;
-                }
-
-                var inputSum = 0;
-                for (const input of obj.inputs) {
-                  const txid = input.outpoint.txid;
-                  const found = objectManager.exists(txid);
-                  if(!found) {
-                    send_message(socket, {
-                      type: 'error',
-                      name: 'INVALID_FORMAT',
-                      description: 'Transaction txid not found in database'
-                    });
-                  }
-
-                  objectManager.get(txid).then(inTransaction => {
-                    for (const o of inTransaction.outputs)  {
-                      inputSum += o.value; 
-                    }
-                  }).catch (err => 
-                    console.error(`[${id}]: get failed`, err)
-                  );
-
-                  if (!verifyAsync(utf8ToBytes(input.sig),utf8ToBytes(canonicalized),utf8ToBytes(obj.outputs[input.outpoint.index].pubkey))) {
-                    send_message(socket, {
-                      type: 'error',
-                      name: 'INVALID_TX_SIGNATURE',
-                      description: 'Invalid signature'
-                    });
-                    return;
-                  }
-                }
-
-                var outputSum = 0;
-                for (const o of obj.outputs) {
-                  outputSum += o.value;
-                }
-
-                if (inputSum < outputSum) {
-                  send_message(socket, {
-                    type: 'error',
-                    name: 'INVALID_TX_CONSERVATION',
-                    description: 'The sum of the outputs is higher than the sum of the inputs'
-                  });
-                  return;
-                }
-                break;
-            }
-
-
-            objectManager.put(obj).then(() => {
-                broadcast_ihaveobject(id, objectid);
-              }).catch((err) => {
-              console.error(`[${id}]: object store failed`, err);
-            })
-          });
-
-          break;
-        }
-
-        case 'error':
-          console.log(`[${id}]: Recieved error: ${message.name} - ${message.description}`)  
-          break
       }
+
+
+      handle_message(socket, id, message);
+      
     }
 
     buffer = messages[0] ?? ''
