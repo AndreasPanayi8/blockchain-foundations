@@ -96,24 +96,87 @@ export const PeersMessageSchema = z.strictObject({
 
 const Hash32Schema = z.string().regex(/^[0-9a-f]{64}$/);
 
-export const TransactionSchema = z.strictObject({
-  type: z.literal('transaction'),
-  inputs: z.array(z.strictObject({
-    outpoint: z.strictObject({
-      txid: z.string(),
-      index: z.int()
-    }),
-    sig: z.string() 
-  })),
-  outputs: z.array(z.strictObject({
-    pubkey: z.string(),
-    value: z.int()
-  }))
-})
+// Hex and non-negative schemas
+const LowerHexSchema = z.string().regex(/^[0-9a-f]+$/, "must be lowercase hex");
+const NonNegativeIntSchema = z.number().int().nonnegative();
 
-export const NetworkObjectSchema = z.discriminatedUnion("type", [
-  TransactionSchema
-])
+// Primitive schemas
+const TxidSchema = LowerHexSchema.length(64);
+const PubKeySchema = LowerHexSchema.length(64);
+const SigSchema = LowerHexSchema.length(128);
+
+const IndexSchema = NonNegativeIntSchema;
+const ValueSchema = NonNegativeIntSchema;
+const HeightSchema = NonNegativeIntSchema;
+
+// Composite schemas
+const OutpointSchema = z.object({
+  txid: TxidSchema,
+  index: IndexSchema,
+});
+
+const InputSchema = z.object({
+  outpoint: OutpointSchema,
+  sig: SigSchema,
+});
+
+const OutputSchema = z.object({
+  value: ValueSchema,
+  pubkey: PubKeySchema,
+});
+
+// Transaction schemas
+const RegularTransactionSchema = z.object({
+  type: z.literal("transaction"),
+  inputs: z.array(InputSchema).nonempty(),
+  outputs: z.array(OutputSchema),
+}).strict();
+
+const CoinbaseTransactionSchema = z.object({
+  type: z.literal("transaction"),
+  height: HeightSchema,
+  outputs: z.array(OutputSchema),
+}).strict();
+
+const TransactionSchema = z.union([
+  RegularTransactionSchema,
+  CoinbaseTransactionSchema,
+]);
+
+//Block type schemas
+const AsciiPrintableSchema = z
+  .string()
+  .max(128)
+  .regex(/^[\x20-\x7E]*$/, "must be ASCII-printable");
+
+const StudentIdSchema = AsciiPrintableSchema;
+
+const NonceSchema = LowerHexSchema.max(64);
+const TargetSchema = LowerHexSchema.length(64);
+
+// Block schemas
+const BlockSchema = z.object({
+  type: z.literal("block"),
+  txids: z.array(TxidSchema),
+  nonce: NonceSchema,
+  previd: z.union([TxidSchema, z.null()]),
+  created: z.number().int(),
+  T: TargetSchema,
+  miner: AsciiPrintableSchema.optional(),
+  note: AsciiPrintableSchema.optional(),
+  studentids: z.array(StudentIdSchema).max(10).optional(),
+}).strict();
+
+const NetworkObjectSchema = z.union([
+  TransactionSchema,
+  BlockSchema,
+]);
+
+const ObjectMessageSchema = z.object({
+  type: z.literal("object"),
+  object: NetworkObjectSchema,
+}).strict();
+
 
 export const GetObjectMessageSchema = z.strictObject({
   type: z.literal("getobject"),
@@ -123,11 +186,6 @@ export const GetObjectMessageSchema = z.strictObject({
 export const IHaveObjectMessageSchema = z.strictObject({
   type: z.literal("ihaveobject"),
   objectid: Hash32Schema,
-});
-
-export const ObjectMessageSchema = z.strictObject({
-  type: z.literal("object"),
-  object: NetworkObjectSchema,
 });
 
 export const GetMempoolMessageSchema = z.strictObject({
