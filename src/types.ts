@@ -126,17 +126,17 @@ const OutputSchema = z.object({
 });
 
 // Transaction schemas
-const RegularTransactionSchema = z.object({
+export const RegularTransactionSchema = z.strictObject({
   type: z.literal("transaction"),
   inputs: z.array(InputSchema).nonempty(),
   outputs: z.array(OutputSchema),
-}).strict();
+});
 
-const CoinbaseTransactionSchema = z.object({
+export const CoinbaseTransactionSchema = z.strictObject({
   type: z.literal("transaction"),
   height: HeightSchema,
   outputs: z.array(OutputSchema),
-}).strict();
+});
 
 const TransactionSchema = z.union([
   RegularTransactionSchema,
