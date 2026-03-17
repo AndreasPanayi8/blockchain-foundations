@@ -164,9 +164,10 @@ async function handle_message(socket: Socket, id: string, message: Message) {
           }
 
           var inputSum = 0;
-          var usedOutputs = new Set<{txid: string, index: number}>();
+          const usedOutputs = new Set<string>();
           for (const input of transaction.inputs) {
-            if(usedOutputs.has(input.outpoint)) {
+            const key = `${input.outpoint.txid}:${input.outpoint.index}`;
+            if (usedOutputs.has(key)) {
               console.error(`[${id}]: Duplicate transaction outpoint`);
               send_message(socket, {
                 type: 'error',
@@ -175,10 +176,11 @@ async function handle_message(socket: Socket, id: string, message: Message) {
               });
               return;
             }
-            usedOutputs.add(input.outpoint);
+
+            usedOutputs.add(key);
 
             const txid = input.outpoint.txid;
-            const found = objectManager.exists(txid);
+            const found = await objectManager.exists(txid);
             if(!found) {
               send_message(socket, {
                 type: 'error',
