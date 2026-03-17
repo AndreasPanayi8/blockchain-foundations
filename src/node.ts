@@ -150,9 +150,12 @@ async function handle_message(socket: Socket, id: string, message: Message) {
 
           const unsigned = {
             type: transaction.type,
-            inputs: transaction.inputs.map(({outpoint,sig}) => {outpoint}),
-            outputs: transaction.outputs
-          }
+            inputs: transaction.inputs.map(({ outpoint, sig }) => ({
+              outpoint,
+              sig: null,
+            })),
+            outputs: transaction.outputs,
+          };
 
           const canonicalized = canonicalize(unsigned);
           if (!canonicalized) {
