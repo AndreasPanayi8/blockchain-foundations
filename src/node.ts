@@ -142,7 +142,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
 
       switch (obj.type) {
         case 'transaction':
-          console.log("Recieved transaction");
+          console.log("Received transaction");
           const reg = RegularTransactionSchema.safeParse(obj);
           if (!reg.success) break;  // Coinbases are valid for now
 
