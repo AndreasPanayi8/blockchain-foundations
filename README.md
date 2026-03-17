@@ -31,6 +31,6 @@ The node discovers another peer if:
 
 ## Contributors
 
-Andreas Panagi
-Maria Zaza
+Andreas Panagi,
+Maria Zaza,
 Michail Vitantzakis
