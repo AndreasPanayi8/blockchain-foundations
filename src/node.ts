@@ -1,11 +1,11 @@
 import { Socket, createServer } from 'net'
-import { type Message, MessageSchema  } from './types'
+import { type Message, MessageSchema, RegularTransactionSchema  } from './types'
 import canonicalize from 'canonicalize'
 import { add_peer, get_peers } from './peers'
 import { objectManager } from './object'
 
 import { verifyAsync } from '@noble/ed25519'
-import { utf8ToBytes } from '@noble/hashes/utils.js'
+import { utf8ToBytes, hexToBytes} from '@noble/hashes/utils.js'
 
 
 const PORT = 18018
@@ -116,6 +116,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
           name: 'UNKNOWN_OBJECT',
           description: `Object ${objectid} not found`
         } as Message);
+        break;
       }
       
       try {
@@ -141,13 +142,20 @@ async function handle_message(socket: Socket, id: string, message: Message) {
 
       switch (obj.type) {
         case 'transaction':
-          console.log("Recieved transaction");
+          console.log("Received transaction");
+          const reg = RegularTransactionSchema.safeParse(obj);
+          if (!reg.success) break;  // Coinbases are valid for now
+
+          const transaction = reg.data;
 
           const unsigned = {
-            type: obj.type,
-            inputs: obj.inputs.map(({outpoint,sig}) => {outpoint}),
-            outputs: obj.outputs
-          }
+            type: transaction.type,
+            inputs: transaction.inputs.map(({ outpoint, sig }) => ({
+              outpoint,
+              sig: null,
+            })),
+            outputs: transaction.outputs,
+          };
 
           const canonicalized = canonicalize(unsigned);
           if (!canonicalized) {
@@ -156,56 +164,81 @@ async function handle_message(socket: Socket, id: string, message: Message) {
           }
 
           var inputSum = 0;
-          for (const input of obj.inputs) {
+          const usedOutputs = new Set<string>();
+          for (const input of transaction.inputs) {
+            const key = `${input.outpoint.txid}:${input.outpoint.index}`;
+            if (usedOutputs.has(key)) {
+              console.error(`[${id}]: Duplicate transaction outpoint`);
+              send_message(socket, {
+                type: 'error',
+                name: 'INVALID_FORMAT',
+                description: 'Transaction outpoints must be unique'
+              });
+              return;
+            }
+
+            usedOutputs.add(key);
+
             const txid = input.outpoint.txid;
-            const found = objectManager.exists(txid);
+            const found = await objectManager.exists(txid);
             if(!found) {
               send_message(socket, {
                 type: 'error',
-                name: 'INVALID_FORMAT',
+                name: 'UNKNOWN_OBJECT',
                 description: 'Transaction txid not found in database'
               });
+              return;
             }
 
             try {
-              const inTransaction = await objectManager.get(txid);
-            for (const o of inTransaction.outputs)  {
-              inputSum += o.value; 
-            }
+              const inObj = await objectManager.get(txid);
+
+              switch (inObj.type) {
+                case 'transaction':
+                  if (input.outpoint.index >= inObj.outputs.length) {
+                    console.error(`[${id}]: Too large transaction outpoint index`);
+                    send_message(socket, {
+                      type: 'error',
+                      name: 'INVALID_TX_OUTPOINT',
+                      description: 'The transaction outpoint index is too large'
+                    });
+                    return;
+                  }
+                  const output = inObj.outputs[input.outpoint.index];
+                  if (output === undefined) {
+                    console.error(`[${id}]: Output object from ${txid} is undefined`);
+                    return;
+                  }
+
+                  const verify = await verifyAsync(
+                    hexToBytes(input.sig),
+                    utf8ToBytes(canonicalized),
+                    hexToBytes(output.pubkey)
+                  );
+                  
+                  if (!verify) {
+                    console.error(`[${id}]: Invalid TX signature`);
+                    send_message(socket, {
+                      type: 'error',
+                      name: 'INVALID_TX_SIGNATURE',
+                      description: 'Invalid signature'
+                    });
+                    return;
+                  }
+
+                  inputSum += output.value;
+                  break;
+                case 'block':
+                  console.log(`[${id}]: Transaction txid is a block id`)
+                  send_message(socket, {
+                    type: 'error',
+                    name: 'INVALID_FORMAT',
+                    description: 'Transaction txid is a block id'
+                  });
+                  return;
+              }
             } catch (err) { 
               console.error(`[${id}]: get failed`, err);
-            }
-
-            if (input.outpoint.index >= obj.outputs.length) {
-              console.error(`[${id}]: Too large transaction outpoint index`);
-              send_message(socket, {
-                type: 'error',
-                name: 'INVALID_TX_OUTPOINT',
-                description: 'The transaction outpoint index is too large'
-              });
-              return;
-            }
-            
-            const output = obj.outputs[input.outpoint.index];
-            if (output !== undefined) {
-              const verify = await verifyAsync(utf8ToBytes(input.sig),utf8ToBytes(canonicalized),utf8ToBytes(output.pubkey)); 
-              if (!verify) {
-                console.error(`[${id}]: Invalid TX signature`);
-                send_message(socket, {
-                  type: 'error',
-                  name: 'INVALID_TX_SIGNATURE',
-                  description: 'Invalid signature'
-                });
-                return;
-              }
-            } else {
-                console.error(`[${id}]: Output object is undefined`);
-                send_message(socket, {
-                type: 'error',
-                name: 'INVALID_FORMAT',
-                description: 'Output object is undefined'
-              });
-              return;
             }
           }
 
