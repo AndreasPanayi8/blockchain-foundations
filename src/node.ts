@@ -116,6 +116,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
           name: 'UNKNOWN_OBJECT',
           description: `Object ${objectid} not found`
         } as Message);
+        break;
       }
       
       try {
