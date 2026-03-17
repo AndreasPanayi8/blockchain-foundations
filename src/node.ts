@@ -5,7 +5,7 @@ import { add_peer, get_peers } from './peers'
 import { objectManager } from './object'
 
 import { verifyAsync } from '@noble/ed25519'
-import { utf8ToBytes } from '@noble/hashes/utils.js'
+import { utf8ToBytes, hexToBytes} from '@noble/hashes/utils.js'
 
 
 const PORT = 18018
@@ -210,7 +210,12 @@ async function handle_message(socket: Socket, id: string, message: Message) {
                     return;
                   }
 
-                  const verify = await verifyAsync(utf8ToBytes(input.sig),utf8ToBytes(canonicalized),utf8ToBytes(output.pubkey)); 
+                  const verify = await verifyAsync(
+                    hexToBytes(input.sig),
+                    utf8ToBytes(canonicalized),
+                    hexToBytes(output.pubkey)
+                  );
+                  
                   if (!verify) {
                     console.error(`[${id}]: Invalid TX signature`);
                     send_message(socket, {
