@@ -166,18 +166,19 @@ async function handle_message(socket: Socket, id: string, message: Message) {
           var inputSum = 0;
           const usedOutputs = new Set<string>();
           for (const input of transaction.inputs) {
-            const key = `${input.outpoint.txid}:${input.outpoint.index}`;
-            if (usedOutputs.has(key)) {
+            const outpointkey = `${input.outpoint.txid}:${input.outpoint.index}`;
+            if (usedOutputs.has(outpointkey)) {
               console.error(`[${id}]: Duplicate transaction outpoint`);
               send_message(socket, {
                 type: 'error',
                 name: 'INVALID_FORMAT',
                 description: 'Transaction outpoints must be unique'
               });
+              socket.end();
               return;
             }
 
-            usedOutputs.add(key);
+            usedOutputs.add(outpointkey);
 
             const txid = input.outpoint.txid;
             const found = await objectManager.exists(txid);
@@ -187,6 +188,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
                 name: 'UNKNOWN_OBJECT',
                 description: 'Transaction txid not found in database'
               });
+              socket.end();
               return;
             }
 
@@ -197,16 +199,23 @@ async function handle_message(socket: Socket, id: string, message: Message) {
                 case 'transaction':
                   if (input.outpoint.index >= inObj.outputs.length) {
                     console.error(`[${id}]: Too large transaction outpoint index`);
-                    send_message(socket, {
+                    await send_message(socket, {
                       type: 'error',
                       name: 'INVALID_TX_OUTPOINT',
                       description: 'The transaction outpoint index is too large'
                     });
+                    socket.end();
                     return;
                   }
                   const output = inObj.outputs[input.outpoint.index];
                   if (output === undefined) {
                     console.error(`[${id}]: Output object from ${txid} is undefined`);
+                    await send_message(socket, {
+                      type: 'error',
+                      name: 'INVALID_FORMAT',
+                      description: 'Referenced output is undefined'
+                    });
+                    socket.end();
                     return;
                   }
 
@@ -218,11 +227,12 @@ async function handle_message(socket: Socket, id: string, message: Message) {
                   
                   if (!verify) {
                     console.error(`[${id}]: Invalid TX signature`);
-                    send_message(socket, {
+                    await send_message(socket, {
                       type: 'error',
                       name: 'INVALID_TX_SIGNATURE',
                       description: 'Invalid signature'
                     });
+                    socket.end();
                     return;
                   }
 
@@ -230,11 +240,12 @@ async function handle_message(socket: Socket, id: string, message: Message) {
                   break;
                 case 'block':
                   console.log(`[${id}]: Transaction txid is a block id`)
-                  send_message(socket, {
+                  await send_message(socket, {
                     type: 'error',
                     name: 'INVALID_FORMAT',
                     description: 'Transaction txid is a block id'
                   });
+                  socket.end();
                   return;
               }
             } catch (err) { 
@@ -249,11 +260,12 @@ async function handle_message(socket: Socket, id: string, message: Message) {
 
           if (inputSum < outputSum) {
             console.error(`[${id}]: Weak law of conservation is not satisfied`);
-            send_message(socket, {
+            await send_message(socket, {
               type: 'error',
               name: 'INVALID_TX_CONSERVATION',
               description: 'The transaction does not satisfy the weak law of conservation'
             });
+            socket.end();
             return;
           }
           break;
