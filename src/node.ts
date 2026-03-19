@@ -72,7 +72,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
   switch (message.type) {
     case 'getpeers':
         console.log(`[${id}]: Requested peers, sending discovered peers`) 
-      send_message(socket, {
+      await send_message(socket, {
         type: 'peers',
         peers: Array.from(discovered_peers).concat(SERVER_ID)
       } as Message)
@@ -96,7 +96,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
       try { 
         const known = await objectManager.exists(objectid);
         if (!known) {
-          send_message(socket, {
+          await send_message(socket, {
               type: 'getobject',
               objectid
           } as Message);
@@ -111,7 +111,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
       
       const known = await objectManager.exists(objectid);
       if (!known) {
-        send_message(socket, {
+        await send_message(socket, {
           type: 'error',
           name: 'UNKNOWN_OBJECT',
           description: `Object ${objectid} not found`
@@ -121,7 +121,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
       
       try {
         const obj = await objectManager.get(objectid);
-        send_message(socket, {
+        await send_message(socket, {
             type: 'object',
             object: obj
         } as Message);
@@ -169,7 +169,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
             const outpointkey = `${input.outpoint.txid}:${input.outpoint.index}`;
             if (usedOutputs.has(outpointkey)) {
               console.error(`[${id}]: Duplicate transaction outpoint`);
-              send_message(socket, {
+              await send_message(socket, {
                 type: 'error',
                 name: 'INVALID_FORMAT',
                 description: 'Transaction outpoints must be unique'
@@ -183,7 +183,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
             const txid = input.outpoint.txid;
             const found = await objectManager.exists(txid);
             if(!found) {
-              send_message(socket, {
+              await send_message(socket, {
                 type: 'error',
                 name: 'UNKNOWN_OBJECT',
                 description: 'Transaction txid not found in database'
@@ -311,12 +311,17 @@ function attach_handlers(socket: Socket, id: string) {
         message = JSON.parse(msg)
       } catch (err) {
         console.error(`[${id}]: Error parsing message as JSON`, msg)
-        send_message(socket, {
+         send_message(socket, {
           type: 'error',
           name: 'INVALID_FORMAT',
           description: 'Received invalid message that could not parse a json'
         } as Message)
+        .catch((err) => {
+          console.error(`[${id}]: failed to send INVALID_FORMAT error`, err)
+        })
+        .finally(() => {
         socket.end()
+        })
         return
       }
       
@@ -325,24 +330,34 @@ function attach_handlers(socket: Socket, id: string) {
         message = MessageSchema.parse(message)
       } catch(err) {
         console.error(`[${id}]: Unknown protocol message`, message)
-        send_message(socket, {
+         send_message(socket, {
           type: 'error',
           name: 'INVALID_FORMAT',
           description: 'Received invalid protocol message that does not match schema'
         } as Message)
+        .catch((err) => {
+          console.error(`[${id}]: failed to send INVALID_FORMAT error`, err)
+         })
+        .finally(() => {  
         socket.end()
+        })
         return
       }
 
       // Check handshake
       if (!connected_peers.has(id) && message.type !== 'hello') {
         console.error(`[${id}]: Invalid handshake, expected hello message first`)
-        send_message(socket, {
+         send_message(socket, {
           type: 'error',
           name: 'INVALID_HANDSHAKE',
           description: 'Did not receive hello message'
         } as Message)
+        .catch((err) => {
+          console.error(`[${id}]: failed to send INVALID_HANDSHAKE error`, err)
+        })
+        .finally(() => {
         socket.end()
+        })
         return
       }
 
