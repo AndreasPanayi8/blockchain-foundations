@@ -345,7 +345,7 @@ function attach_handlers(socket: Socket, id: string) {
       }
 
       // Check handshake
-      if (!connected_peers.has(id) && message.type !== 'hello') {
+      if (!peerSockets.has(id) && message.type !== 'hello') {
         console.error(`[${id}]: Invalid handshake, expected hello message first`)
          send_message(socket, {
           type: 'error',
@@ -364,7 +364,6 @@ function attach_handlers(socket: Socket, id: string) {
       // Valid message
       if (message.type === 'hello') {
         console.log(`[${id}]: Received hello message, connecting to node with name ${message.agent} and version ${message.version}`)
-        connected_peers.add(id)
         peerSockets.set(id, socket)
         if(!discovered_peers.has(id)){
           discovered_peers.add(id)
@@ -385,7 +384,6 @@ function attach_handlers(socket: Socket, id: string) {
   })
 
   socket.on('close', () => {
-    connected_peers.delete(id)
     peerSockets.delete(id)
     console.log(`[${id}]: Disconnected`)
   })
@@ -393,7 +391,6 @@ function attach_handlers(socket: Socket, id: string) {
 
 
 let discovered_peers = get_peers();
-let connected_peers = new Set<string>();
 const peerSockets = new Map<string, Socket>();
 
 const server = createServer(async (socket) => {
