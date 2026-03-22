@@ -155,13 +155,13 @@ const NonceSchema = LowerHexSchema.max(64);
 const TargetSchema = LowerHexSchema.length(64);
 
 // Block schemas
-const BlockSchema = z.object({
+export const BlockSchema = z.strictObject({
   type: z.literal("block"),
   txids: z.array(TxidSchema),
-  nonce: NonceSchema,
+  nonce: LowerHexSchema.max(64),
   previd: z.union([TxidSchema, z.null()]),
   created: z.number().int(),
-  T: TargetSchema,
+  T: TargetSchema.length,
   miner: AsciiPrintableSchema.optional(),
   note: AsciiPrintableSchema.optional(),
   studentids: z.array(StudentIdSchema).max(10).optional(),
@@ -225,6 +225,9 @@ export const MessageSchema = z.discriminatedUnion("type", [
 ]);
 
 
+
+export type Block = z.infer<typeof BlockSchema>;
+export type Transaction = z.infer<typeof TransactionSchema>;
 export type Message = z.infer<typeof MessageSchema>
 export type NetworkObject = z.infer<typeof NetworkObjectSchema>;
 export type GetObjectMessage = z.infer<typeof GetObjectMessageSchema>;

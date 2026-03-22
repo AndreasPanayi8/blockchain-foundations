@@ -6,6 +6,9 @@ import { objectManager } from './object'
 
 import { verifyAsync } from '@noble/ed25519'
 import { utf8ToBytes, hexToBytes} from '@noble/hashes/utils.js'
+import {safeParseBlock} from './block'
+import { Block } from "./types"
+
 
 
 const PORT = 18018
@@ -238,15 +241,26 @@ async function handle_message(socket: Socket, id: string, message: Message) {
 
                   inputSum += output.value;
                   break;
-                case 'block':
-                  console.log(`[${id}]: Transaction txid is a block id`)
-                  await send_message(socket, {
-                    type: 'error',
-                    name: 'INVALID_FORMAT',
-                    description: 'Transaction txid is a block id'
-                  });
-                  socket.end();
-                  return;
+
+                case 'block': {
+                  const parsed = safeParseBlock(obj);
+
+                  if (!parsed.success) {
+                    console.error(`[${id}]: Invalid block format`, parsed.error);
+                    await send_message(socket, {
+                      type: 'error',
+                      name: 'INVALID_FORMAT',
+                      description: 'Received invalid block object'
+                    });
+                    socket.end();
+                    return;
+                  }
+
+                  const block = parsed.data;
+                  console.log(`[${id}]: Received block with ${block.txids.length} txids`);
+                  break
+                }
+                  
               }
             } catch (err) { 
               console.error(`[${id}]: get failed`, err);
