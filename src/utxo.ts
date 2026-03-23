@@ -42,13 +42,13 @@ export class UTXOManager {
     await this.db.put(blockid, state);
   }
 
-  async getBaseState(previd: string | null): Promise<UTXOState | null> {
+  async getBaseState(previd: string | null): Promise<UTXOState> {
     if (previd === null) {
       return this.emptyState();
     }
 
     if (!(await this.exists(previd))) {
-      return null;
+      throw new Error(`UTXO state for block ${previd} not found`)
     }
 
     const parentState = await this.get(previd);
