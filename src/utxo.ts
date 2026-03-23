@@ -1,52 +1,96 @@
-class UTXO {
-  private outpoints : Map<string, number>
-  private toSpend : Map <string, number>
+import { Level } from "level";
 
-  constructor() {
-    this.outpoints = new Map<string, number>();
-    this.toSpend = new Map<string, number>();
+export type UTXOEntry = {
+  pubkey: string;
+  value: number;
+};
 
-    // TODO: load UTXO
+export type UTXOState = Record<string, UTXOEntry>;
+
+export function outpointKey(txid: string, index: number): string {
+  return `${txid}:${index}`;
+}
+
+export class UTXOManager {
+  private db = new Level<string, UTXOState>("./storage/utxos", {
+    valueEncoding: "json",
+  });
+
+  emptyState(): UTXOState {
+    return {};
   }
 
-  async add_outpoint(outpointkey: string, amount: number) {
-    if(!this.outpoints.has(outpointkey)) {
-      this.outpoints.set(outpointkey, amount);
+  cloneState(state: UTXOState): UTXOState {
+    return Object.fromEntries(
+      Object.entries(state).map(([k, v]) => [k, { ...v }])
+    );
+  }
+
+  async exists(blockid: string): Promise<boolean> {
+    return await this.db.has(blockid);
+  }
+
+  async get(blockid: string): Promise<UTXOState> {
+    try {
+      return await this.db.get(blockid);
+    } catch {
+      throw new Error(`UTXO state for block ${blockid} not found`);
     }
   }
 
-  async spend(outpointkey: string, amount: number) {
-    const outAmount = this.outpoints.get(outpointkey);
-    if (outAmount === undefined) {
-      throw new Error(`Outpoint key ${outpointkey} not found in UTXO`);
-    }
-
-    const alreadySpent = this.outpoints.get(outpointkey);
-    
-    if (alreadySpent === undefined) {
-      if (outAmount < amount) {
-        throw new Error(`INVALID_TX_OUTPOINT`);
-      }
-      this.toSpend.set(outpointkey, amount);
-    } else {
-      if (outAmount < amount + alreadySpent) {
-        throw new Error(`INVALID_TX_OUTPOINT`);
-      }
-
-      this.toSpend.set(outpointkey, amount + alreadySpent);
-    }
-
+  async put(blockid: string, state: UTXOState): Promise<void> {
+    await this.db.put(blockid, state);
   }
 
-  async apply_transactions() {
-    for (const [outpointkey, amount] of this.toSpend) {
-      const oldAmount = this.outpoints.get(outpointkey);
-      if (oldAmount === undefined) {
-        throw new Error(`Outpoint key ${outpointkey} not found in UTXO`);
-      }
-
-      this.outpoints.set(outpointkey, oldAmount - amount);
+  async getBaseState(previd: string | null): Promise<UTXOState | null> {
+    if (previd === null) {
+      return this.emptyState();
     }
-    this.toSpend.clear();
+
+    if (!(await this.exists(previd))) {
+      return null;
+    }
+
+    const parentState = await this.get(previd);
+    return this.cloneState(parentState);
+  }
+
+  hasOutpoint(state: UTXOState, key: string): boolean {
+    return state[key] !== undefined;
+  }
+
+  getOutpoint(state: UTXOState, key: string): UTXOEntry | undefined {
+    return state[key];
+  }
+
+  spendOutpoint(state: UTXOState, key: string): UTXOEntry {
+    const entry = state[key];
+    if (entry === undefined) {
+      throw new Error("INVALID_TX_OUTPOINT");
+    }
+
+    delete state[key];
+    return entry;
+  }
+
+  addOutpoint(
+    state: UTXOState,
+    txid: string,
+    index: number,
+    output: UTXOEntry
+  ): void {
+    state[outpointKey(txid, index)] = { ...output };
+  }
+
+  addOutputs(
+    state: UTXOState,
+    txid: string,
+    outputs: Array<UTXOEntry>
+  ): void {
+    outputs.forEach((output, index) => {
+      this.addOutpoint(state, txid, index, output);
+    });
   }
 }
+
+export const utxoManager = new UTXOManager();
