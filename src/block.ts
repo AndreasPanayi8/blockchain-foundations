@@ -1,19 +1,11 @@
-import canonicalize from "canonicalize";
-import {blake2s} from "@noble/hashes/blake2.js";
-import {utf8ToBytes, bytesToHex} from "@noble/hashes/utils.js";
-import{BlockSchema, type Block} from "./types";
-
-export const REQUIRED_TARGET =
-"00000000abc00000000000000000000000000000000000000000000000000000";
-
-export function parseBlock(value: unknown): Block {
-  return BlockSchema.parse(value);
-}
-
-export function safeParseBlock(value: unknown): Block{
-  const result = BlockSchema.safeParse(value);
-  if (result.success) {
-    return result.data;
-  }
-  throw new Error(`Invalid block: ${result.error.message}`);
+import type { Socket } from "net";
+import{type Block} from "./types";
+import { send_error } from "./networking";
+ 
+export async function verifyBlock(node_id : string, socket : Socket, block : Block, block_id : string) : Promise<boolean> {
+  if (Number('0x' + block_id) >= Number('0x' + block.T)) {
+    await send_error(node_id, socket, 'INVALID_BLOCK_POW', 'Proof of work failed');
+    return false;
+  } 
+  return true;
 }

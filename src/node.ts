@@ -1,72 +1,14 @@
 import { Socket, createServer } from 'net'
-import { type Message, MessageSchema, RegularTransactionSchema  } from './types'
-import canonicalize from 'canonicalize'
+import { type Message, MessageSchema } from './types'
 import { add_peer, get_peers } from './peers'
 import { objectManager } from './object'
 
-import { verifyAsync } from '@noble/ed25519'
-import { utf8ToBytes, hexToBytes} from '@noble/hashes/utils.js'
-
+import { send_message, send_error, connect, broadcast_ihaveobject, parse_peer_address} from './networking'
+import { verifyTransaction } from './transaction'
+import { verifyBlock } from './block'
 
 const PORT = 18018
 const SERVER_ID = '95.179.176.219:'+PORT
-const NAME = 'MMA'
-const VERSION = '0.10.1'
-
-
-function parse_peer_address(peer: string): { host: string, port: number } | null {
-    //[IPv6]:port
-    if (peer.startsWith('[')) {
-        const close = peer.indexOf(']')
-        if (close === -1) {
-            return null
-        }
-        const host = peer.slice(1, close).trim()
-        const rest = peer.slice(close + 1)
-        if (!rest.startsWith(':')) return null
-        const port = Number(rest.slice(1).trim())
-        if (!host || !Number.isInteger(port) || port < 1 || port > 65535) return null
-        return { host, port }
-    }
-
-    //IPv4 or dns
-    const idx = peer.lastIndexOf(':')
-    if (idx <= 0) return null
-    const host = peer.slice(0, idx).trim()
-    const port = Number(peer.slice(idx + 1).trim())
-    if (!host || !Number.isInteger(port) || port < 1 || port > 65535) return null
-    return { host, port }
-}
-
-// Networking helper functions
-    
-async function send_message(socket: Socket, msg: Message) {
-  socket.write(canonicalize(msg) + '\n')
-}
-
-async function broadcast_ihaveobject(exceptPeerId: string, objectid: string) {
-    for (const [peerId, sock] of peerSockets.entries()) {
-        if (peerId === exceptPeerId) continue;
-        if (sock.destroyed) continue; 
-        await send_message(sock, {
-            type: 'ihaveobject',
-            objectid
-        } as Message);
-    }
-  }
-
-// Handshake
-async function connect(socket: Socket) {
-    await send_message(socket, {
-        type: 'hello',
-        version: VERSION,
-        agent: NAME
-    } as Message)
-
-    await send_message(socket, {
-        type: 'getpeers'
-    } as Message)
-}
 
 async function handle_message(socket: Socket, id: string, message: Message) {
   switch (message.type) {
@@ -111,11 +53,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
       
       const known = await objectManager.exists(objectid);
       if (!known) {
-        await send_message(socket, {
-          type: 'error',
-          name: 'UNKNOWN_OBJECT',
-          description: `Object ${objectid} not found`
-        } as Message);
+        await send_error(id, socket, 'UNKNOWN_OBJECT', `Object ${objectid} not found`, false);
         break;
       }
       
@@ -142,154 +80,16 @@ async function handle_message(socket: Socket, id: string, message: Message) {
 
       switch (obj.type) {
         case 'transaction':
-          console.log("Received transaction");
-          const reg = RegularTransactionSchema.safeParse(obj);
-          if (!reg.success) break;  // Coinbase validation is checked at block validation
-
-          const transaction = reg.data;
-
-          const unsigned = {
-            type: transaction.type,
-            inputs: transaction.inputs.map(({ outpoint, sig }) => ({
-              outpoint,
-              sig: null,
-            })),
-            outputs: transaction.outputs,
-          };
-
-          const canonicalized = canonicalize(unsigned);
-          if (!canonicalized) {
-            console.log("Failed to canonicalize unsigned transaction");
-            return;
-          }
-
-          var inputSum = 0;
-          const usedOutputs = new Set<string>();
-          for (const input of transaction.inputs) {
-            const outpointkey = `${input.outpoint.txid}:${input.outpoint.index}`;
-            if (usedOutputs.has(outpointkey)) {
-              console.error(`[${id}]: Duplicate transaction outpoint`);
-              await send_message(socket, {
-                type: 'error',
-                name: 'INVALID_FORMAT',
-                description: 'Transaction outpoints must be unique'
-              });
-              socket.end();
-              return;
-            }
-
-            usedOutputs.add(outpointkey);
-
-            const txid = input.outpoint.txid;
-            const found = await objectManager.exists(txid);
-            if(!found) {
-              await send_message(socket, {
-                type: 'error',
-                name: 'UNKNOWN_OBJECT',
-                description: 'Transaction txid not found in database'
-              });
-              socket.end();
-              return;
-            }
-
-            try {
-              const inObj = await objectManager.get(txid);
-
-              switch (inObj.type) {
-                case 'transaction':
-                  if (input.outpoint.index >= inObj.outputs.length) {
-                    console.error(`[${id}]: Too large transaction outpoint index`);
-                    await send_message(socket, {
-                      type: 'error',
-                      name: 'INVALID_TX_OUTPOINT',
-                      description: 'The transaction outpoint index is too large'
-                    });
-                    socket.end();
-                    return;
-                  }
-                  const output = inObj.outputs[input.outpoint.index];
-                  if (output === undefined) {
-                    console.error(`[${id}]: Output object from ${txid} is undefined`);
-                    await send_message(socket, {
-                      type: 'error',
-                      name: 'INVALID_FORMAT',
-                      description: 'Referenced output is undefined'
-                    });
-                    socket.end();
-                    return;
-                  }
-
-                  const verify = await verifyAsync(
-                    hexToBytes(input.sig),
-                    utf8ToBytes(canonicalized),
-                    hexToBytes(output.pubkey)
-                  );
-                  
-                  if (!verify) {
-                    console.error(`[${id}]: Invalid TX signature`);
-                    await send_message(socket, {
-                      type: 'error',
-                      name: 'INVALID_TX_SIGNATURE',
-                      description: 'Invalid signature'
-                    });
-                    socket.end();
-                    return;
-                  }
-
-                  inputSum += output.value;
-                  break;
-
-                case 'block':
-                  console.log(`[${id}]: Transaction txid is a block id`)
-                  await send_message(socket, {
-                    type: 'error',
-                    name: 'INVALID_FORMAT',
-                    description: 'Transaction txid is a block id'
-                  });
-                  socket.end();
-                  return;
-              }
-            } catch (err) { 
-              console.error(`[${id}]: get failed`, err);
-            }
-          }
-
-          var outputSum = 0;
-          for (const o of obj.outputs) {
-            outputSum += o.value;
-          }
-
-          if (inputSum < outputSum) {
-            console.error(`[${id}]: Weak law of conservation is not satisfied`);
-            await send_message(socket, {
-              type: 'error',
-              name: 'INVALID_TX_CONSERVATION',
-              description: 'The transaction does not satisfy the weak law of conservation'
-            });
-            socket.end();
-            return;
-          }
+          if (!(await verifyTransaction(id, socket, obj))) return;
           break;
-
         case 'block':
-            if (Number('0x' + objectid) >= Number('0x' + obj.T)) {
-              console.error(`[${id}]: Proof of work failed`);
-              await send_message(socket, {
-                type: 'error',
-                name: 'INVALID_BLOCK_POW',
-                description: 'Proof of work failed'
-              });
-              socket.end();
-              return;
-            } 
-
-
+          if (!(await verifyBlock(id, socket, obj, objectid))) return;
           break
       }
 
       try {
         await objectManager.put(obj)
-        broadcast_ihaveobject(id, objectid);
+        broadcast_ihaveobject(peerSockets, id, objectid);
       } catch(err) {
         console.error(`[${id}]: object store failed`, err);
       }
@@ -326,18 +126,7 @@ function attach_handlers(socket: Socket, id: string) {
       try {
         message = JSON.parse(msg)
       } catch (err) {
-        console.error(`[${id}]: Error parsing message as JSON`, msg)
-         send_message(socket, {
-          type: 'error',
-          name: 'INVALID_FORMAT',
-          description: 'Received invalid message that could not parse a json'
-        } as Message)
-        .catch((err) => {
-          console.error(`[${id}]: failed to send INVALID_FORMAT error`, err)
-        })
-        .finally(() => {
-        socket.end()
-        })
+        send_error(id, socket, 'INVALID_FORMAT', 'Error parsing message as JSON');
         return
       }
       
@@ -345,35 +134,13 @@ function attach_handlers(socket: Socket, id: string) {
       try {
         message = MessageSchema.parse(message)
       } catch(err) {
-        console.error(`[${id}]: Unknown protocol message`, message)
-         send_message(socket, {
-          type: 'error',
-          name: 'INVALID_FORMAT',
-          description: 'Received invalid protocol message that does not match schema'
-        } as Message)
-        .catch((err) => {
-          console.error(`[${id}]: failed to send INVALID_FORMAT error`, err)
-         })
-        .finally(() => {  
-        socket.end()
-        })
+        send_error(id, socket, 'INVALID_FORMAT', 'Unknown protocol message');
         return
       }
 
       // Check handshake
       if (!peerSockets.has(id) && message.type !== 'hello') {
-        console.error(`[${id}]: Invalid handshake, expected hello message first`)
-         send_message(socket, {
-          type: 'error',
-          name: 'INVALID_HANDSHAKE',
-          description: 'Did not receive hello message'
-        } as Message)
-        .catch((err) => {
-          console.error(`[${id}]: failed to send INVALID_HANDSHAKE error`, err)
-        })
-        .finally(() => {
-        socket.end()
-        })
+        send_error(id, socket, 'INVALID_HANDSHAKE', 'Did not receive hello message');
         return
       }
 
@@ -385,7 +152,6 @@ function attach_handlers(socket: Socket, id: string) {
 
 
       handle_message(socket, id, message);
-      
     }
 
     buffer = messages[0] ?? ''
@@ -401,9 +167,8 @@ function attach_handlers(socket: Socket, id: string) {
   })
 }
 
-
 let discovered_peers = get_peers();
-const peerSockets = new Map<string, Socket>();
+export const peerSockets = new Map<string, Socket>();
 
 const server = createServer(async (socket) => {
     const id = `${socket.remoteAddress}:${socket.remotePort}`
@@ -414,39 +179,39 @@ const server = createServer(async (socket) => {
 })
 
 async function connect_to_random_discovered_peer() {
-    const peersArr = Array.from(discovered_peers).filter((p) => p !== SERVER_ID)
-    if (peersArr.length === 0) {
-        console.log(`No discovered peers to connect to`)
-        return
-    }
-    
-    // Pick random peer
-    const peer = peersArr[Math.floor(Math.random() * peersArr.length)]
-    if (!peer) return
-    
-    const parsed = parse_peer_address(peer)
-    if (!parsed) {
-        console.error(`Bad peer format: ${peer}`)
-        return
-    }
-
-    const { host, port } = parsed
-
-    const outbound = new Socket()
-
-    outbound.connect(port, host, async () => {
-        const id = `${outbound.remoteAddress}:${outbound.remotePort}`
-        console.log(`Outbound connected to ${peer} (${id})`)
-
-        attach_handlers(outbound, id)
-        await connect(outbound)
-    })
-
-    outbound.on('error', (err) => {
-        console.error(`Error connecting to peer ${peer}:`, err)
-    })
-    
+  const peersArr = Array.from(discovered_peers).filter((p) => p !== SERVER_ID)
+  if (peersArr.length === 0) {
+      console.log(`No discovered peers to connect to`)
+      return
   }
+  
+  // Pick random peer
+  const peer = peersArr[Math.floor(Math.random() * peersArr.length)]
+  if (!peer) return
+  
+  const parsed = parse_peer_address(peer)
+  if (!parsed) {
+      console.error(`Bad peer format: ${peer}`)
+      return
+  }
+
+  const { host, port } = parsed
+
+  const outbound = new Socket()
+
+  outbound.connect(port, host, async () => {
+      const id = `${outbound.remoteAddress}:${outbound.remotePort}`
+      console.log(`Outbound connected to ${peer} (${id})`)
+
+      attach_handlers(outbound, id)
+      await connect(outbound)
+  })
+
+  outbound.on('error', (err) => {
+      console.error(`Error connecting to peer ${peer}:`, err)
+  })
+  
+}
 
 // Start the server
 server.listen(PORT, async() => {
