@@ -1,10 +1,18 @@
-import z, { object } from 'zod'
+import z, { literal, object } from 'zod'
+
+const Hash32Schema = z.string().regex(/^[0-9a-f]{64}$/);
+const LowerHexSchema = z.string().regex(/^[0-9a-f]+$/, "must be lowercase hex");
+const NonNegativeIntSchema = z.int().nonnegative();
+const AsciiPrintableSchema = z
+  .string()
+  .max(128)
+  .regex(/^[\x20-\x7E]*$/, "must be ASCII-printable");
 
 export const HelloMessageSchema = z.strictObject({
     type: z.literal('hello'),
     version: z.string().regex(/^0\.10\.[0-9]+$/),
-    agent: z.optional(z.string().max(128))
-})
+    agent: AsciiPrintableSchema.optional()
+});
 
 export const ErrorMessageSchema = z.strictObject({
   type: z.literal("error"),
@@ -94,35 +102,23 @@ export const PeersMessageSchema = z.strictObject({
 });
 
 
-const Hash32Schema = z.string().regex(/^[0-9a-f]{64}$/);
-
-// Hex and non-negative schemas
-const LowerHexSchema = z.string().regex(/^[0-9a-f]+$/, "must be lowercase hex");
-const NonNegativeIntSchema = z.number().int().nonnegative();
-
 // Primitive schemas
 const TxidSchema = LowerHexSchema.length(64);
-const PubKeySchema = LowerHexSchema.length(64);
-const SigSchema = LowerHexSchema.length(128);
-
-const IndexSchema = NonNegativeIntSchema;
-const ValueSchema = NonNegativeIntSchema;
-const HeightSchema = NonNegativeIntSchema;
 
 // Composite schemas
-const OutpointSchema = z.object({
+const OutpointSchema = z.strictObject({
   txid: TxidSchema,
-  index: IndexSchema,
+  index: NonNegativeIntSchema,
 });
 
-const InputSchema = z.object({
+const InputSchema = z.strictObject({
   outpoint: OutpointSchema,
-  sig: SigSchema,
+  sig: LowerHexSchema.length(128),
 });
 
-const OutputSchema = z.object({
-  value: ValueSchema,
-  pubkey: PubKeySchema,
+const OutputSchema = z.strictObject({
+  value: NonNegativeIntSchema,
+  pubkey: LowerHexSchema.length(64),
 });
 
 // Transaction schemas
@@ -134,7 +130,7 @@ export const RegularTransactionSchema = z.strictObject({
 
 export const CoinbaseTransactionSchema = z.strictObject({
   type: z.literal("transaction"),
-  height: HeightSchema,
+  height: NonNegativeIntSchema,
   outputs: z.array(OutputSchema),
 });
 
@@ -143,29 +139,18 @@ const TransactionSchema = z.union([
   CoinbaseTransactionSchema,
 ]);
 
-//Block type schemas
-const AsciiPrintableSchema = z
-  .string()
-  .max(128)
-  .regex(/^[\x20-\x7E]*$/, "must be ASCII-printable");
-
-const StudentIdSchema = AsciiPrintableSchema;
-
-const NonceSchema = LowerHexSchema.max(64);
-const TargetSchema = LowerHexSchema.length(64);
-
 // Block schemas
 export const BlockSchema = z.strictObject({
   type: z.literal("block"),
   txids: z.array(TxidSchema),
-  nonce: LowerHexSchema.max(64),
+  nonce: LowerHexSchema.length(64),
   previd: z.union([TxidSchema, z.null()]),
-  created: z.number().int(),
-  T: TargetSchema.length,
+  created: NonNegativeIntSchema,
+  T: literal('00000000abc00000000000000000000000000000000000000000000000000000'),
   miner: AsciiPrintableSchema.optional(),
   note: AsciiPrintableSchema.optional(),
-  studentids: z.array(StudentIdSchema).max(10).optional(),
-}).strict();
+  studentids: z.array(AsciiPrintableSchema).max(10).optional(),
+});
 
 const NetworkObjectSchema = z.union([
   TransactionSchema,
