@@ -1,11 +1,69 @@
 import type { Socket } from "net";
-import{type Block} from "./types";
+import{CoinbaseTransactionSchema, RegularTransactionSchema, type Block} from "./types";
 import { send_error } from "./networking";
+import { objectManager } from "./object";
+import { get_transaction } from "./transaction";
  
 export async function verifyBlock(node_id : string, socket : Socket, block : Block, block_id : string) : Promise<boolean> {
   if (Number('0x' + block_id) >= Number('0x' + block.T)) {
     await send_error(node_id, socket, 'INVALID_BLOCK_POW', 'Proof of work failed');
     return false;
-  } 
+  }
+
+  let fee = 50;
+  const firstTxid = block.txids[0];
+  if (firstTxid === undefined) return false;
+
+  try {
+    const firstTransaction = await get_transaction(node_id, socket, firstTxid);
+
+    const c = CoinbaseTransactionSchema.safeParse(firstTransaction)
+
+    for (let i = 1;i < block.txids.length;++i) {
+      const txid = block.txids[i];
+      if (txid === undefined) return false;
+      
+      const t = await get_transaction(node_id, socket, txid);
+      const reg = RegularTransactionSchema.safeParse(t);
+      if(!reg.success) {
+        await send_error(node_id, socket, 'INVALID_BLOCK_COINBASE', 'Coinbase must be at 0 index in the block');
+        return false;
+      }
+      const transaction = reg.data;
+
+      for (const input of transaction.inputs) {
+        if (c.success && input.outpoint.txid === firstTxid) {
+          await send_error(node_id, socket, 'INVALID_BLOCK_COINBASE', 'Coinbase cannot be spent in its block');
+          return false;
+        }
+        if (c.success) {
+          const inTransaction = await get_transaction(node_id, socket, input.outpoint.txid);
+          const output = inTransaction.outputs[input.outpoint.index];
+          if (output === undefined) return false; 
+          fee += output.value;
+        }
+      }
+
+      if (c.success) {
+        const coinbase = c.data;
+
+        for (const output of transaction.outputs) {
+          fee -= output.value;
+        }
+
+        let coinbaseOut = 0;
+        for (const output of coinbase.outputs) {
+          coinbaseOut += output.value;
+        } 
+
+        if (coinbaseOut > fee) {
+          await send_error(node_id, socket, 'INVALID_BLOCK_COINBASE', 'Coinbase\'s total output exceeded fees + reward');
+          return false;
+        }
+      }
+    }
+  } catch { 
+    return false;
+  }
   return true;
 }
