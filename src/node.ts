@@ -6,9 +6,6 @@ import { objectManager } from './object'
 
 import { verifyAsync } from '@noble/ed25519'
 import { utf8ToBytes, hexToBytes} from '@noble/hashes/utils.js'
-import {safeParseBlock} from './block'
-import { Block } from "./types"
-
 
 
 const PORT = 18018
@@ -147,7 +144,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
         case 'transaction':
           console.log("Received transaction");
           const reg = RegularTransactionSchema.safeParse(obj);
-          if (!reg.success) break;  // Coinbases are valid for now
+          if (!reg.success) break;  // Coinbase validation is checked at block validation
 
           const transaction = reg.data;
 
@@ -242,25 +239,15 @@ async function handle_message(socket: Socket, id: string, message: Message) {
                   inputSum += output.value;
                   break;
 
-                case 'block': {
-                  const parsed = safeParseBlock(obj);
-
-                  if (!parsed.success) {
-                    console.error(`[${id}]: Invalid block format`, parsed.error);
-                    await send_message(socket, {
-                      type: 'error',
-                      name: 'INVALID_FORMAT',
-                      description: 'Received invalid block object'
-                    });
-                    socket.end();
-                    return;
-                  }
-
-                  const block = parsed.data;
-                  console.log(`[${id}]: Received block with ${block.txids.length} txids`);
-                  break
-                }
-                  
+                case 'block':
+                  console.log(`[${id}]: Transaction txid is a block id`)
+                  await send_message(socket, {
+                    type: 'error',
+                    name: 'INVALID_FORMAT',
+                    description: 'Transaction txid is a block id'
+                  });
+                  socket.end();
+                  return;
               }
             } catch (err) { 
               console.error(`[${id}]: get failed`, err);
@@ -283,14 +270,29 @@ async function handle_message(socket: Socket, id: string, message: Message) {
             return;
           }
           break;
-        }
 
-        try {
-          await objectManager.put(obj)
-          broadcast_ihaveobject(id, objectid);
-        } catch(err) {
-          console.error(`[${id}]: object store failed`, err);
-        }
+        case 'block':
+            if (Number('0x' + objectid) >= Number('0x' + obj.T)) {
+              console.error(`[${id}]: Proof of work failed`);
+              await send_message(socket, {
+                type: 'error',
+                name: 'INVALID_BLOCK_POW',
+                description: 'Proof of work failed'
+              });
+              socket.end();
+              return;
+            } 
+
+
+          break
+      }
+
+      try {
+        await objectManager.put(obj)
+        broadcast_ihaveobject(id, objectid);
+      } catch(err) {
+        console.error(`[${id}]: object store failed`, err);
+      }
 
       break;
     }
@@ -378,11 +380,7 @@ function attach_handlers(socket: Socket, id: string) {
       // Valid message
       if (message.type === 'hello') {
         console.log(`[${id}]: Received hello message, connecting to node with name ${message.agent} and version ${message.version}`)
-        peerSockets.set(id, socket)
-        if(!discovered_peers.has(id)){
-          discovered_peers.add(id)
-          add_peer(id)
-        }
+        peerSockets.set(id, socket);
       }
 
 
