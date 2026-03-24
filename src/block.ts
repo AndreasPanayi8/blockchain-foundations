@@ -14,6 +14,8 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
   if (UTXO === null) return false;  // If the previous block is not in the database it is ingored
 
   let fee = 50_000_000_000_000;
+
+  // First transaction validation
   const firstTxid = block.txids[0];
   if (firstTxid === undefined) return false;
   try {
@@ -22,6 +24,7 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
     const c = CoinbaseTransactionSchema.safeParse(firstTransaction)
 
     if (!c.success) {
+      // If the first transaction is not a coinbase spend its inputs
       const reg = RegularTransactionSchema.parse(firstTransaction);
       for (const input of reg.inputs) {
         try {
@@ -34,18 +37,23 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
       }
     }
 
+    // Create transaction's outputs
     utxoManager.addOutputs(UTXO, firstTxid, firstTransaction.outputs)
 
+    // Validate the rest transactions
     for (let i = 1;i < block.txids.length;++i) {
       const txid = block.txids[i];
       if (txid === undefined) return false;
       
       const t = await get_transaction(txid);
       const reg = RegularTransactionSchema.safeParse(t);
+      
       if(!reg.success) {
+        // The transaction is a coinbase
         await send_error(node_id, socket, 'INVALID_BLOCK_COINBASE', 'Coinbase must be at 0');
         return false;
       }
+      
       const transaction = reg.data;
 
       for (const input of transaction.inputs) {
@@ -54,6 +62,7 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
           return false;
         }
 
+        // Spend the transaction outpoint
         try {
           utxoManager.spendOutpoint(UTXO, outpointKey(input.outpoint.txid, input.outpoint.index));
         }
@@ -63,6 +72,7 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
         }
         
         if (c.success) {
+          // Collect the fee from the inputs
           const inTransaction = await get_transaction(input.outpoint.txid);
           const output = inTransaction.outputs[input.outpoint.index];
           if (output === undefined) return false; 
@@ -71,12 +81,16 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
       }
 
       for (const output of transaction.outputs) {
+        // Reduce the fee by the amount spend
         fee -= output.value;
       }
+      
+      // Create transaction's outputs
       utxoManager.addOutputs(UTXO, txid, transaction.outputs);
     }
 
     if (c.success) {
+      // Check for law of conservation for the coinbase transaction, if it exists
       const coinbase = c.data;
 
       let coinbaseOut = 0;
