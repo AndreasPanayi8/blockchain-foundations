@@ -1,7 +1,6 @@
 import type { Socket } from "net";
 import{CoinbaseTransactionSchema, RegularTransactionSchema, type Block} from "./types";
 import { send_error } from "./networking";
-import { objectManager } from "./object";
 import { get_transaction } from "./transaction";
 import { outpointKey, utxoManager } from "./utxo";
  
@@ -14,7 +13,7 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
   let UTXO = await utxoManager.getBaseState(block.previd);
   if (UTXO === null) return true;
 
-  let fee = 50;
+  let fee = 50_000_000_000_000;
   const firstTxid = block.txids[0];
   if (firstTxid === undefined) return false;
   try {
@@ -54,6 +53,15 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
           await send_error(node_id, socket, 'INVALID_BLOCK_COINBASE', 'Coinbase cannot be spent in its block');
           return false;
         }
+
+        try {
+          utxoManager.spendOutpoint(UTXO, outpointKey(input.outpoint.txid, input.outpoint.index));
+        }
+        catch {
+          await send_error(node_id, socket, 'INVALID_TX_OUTPOINT', 'Could not spend transaction\'s input');
+          return false;
+        }
+        
         if (c.success) {
           const inTransaction = await get_transaction(input.outpoint.txid);
           const output = inTransaction.outputs[input.outpoint.index];
