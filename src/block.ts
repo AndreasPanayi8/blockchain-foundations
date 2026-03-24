@@ -58,7 +58,7 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
 
       for (const input of transaction.inputs) {
         if (c.success && input.outpoint.txid === firstTxid) {
-          await send_error(node_id, socket, 'INVALID_BLOCK_COINBASE', 'Coinbase cannot be spent in its block');
+          await send_error(node_id, socket, 'INVALID_TX_OUTPOINT', 'Coinbase cannot be spent in its block');
           return false;
         }
 
@@ -105,12 +105,12 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
     }
   } catch (e) {
     console.error(`[${node_id}]: ` +  e);
-    send_error(node_id, socket, 'UNFINDABLE_OBJECT', `Transaction txid not found in database`); 
+    await send_error(node_id, socket, 'UNFINDABLE_OBJECT', `Transaction txid not found in database`); 
     return false;
   }
 
   try {
-    utxoManager.put(block_id, UTXO);
+    await utxoManager.put(block_id, UTXO);
   } catch (e) {
     console.error(`[${node_id}] utxo manager put failed`, e);
     return false;

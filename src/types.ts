@@ -131,7 +131,7 @@ export const RegularTransactionSchema = z.strictObject({
 export const CoinbaseTransactionSchema = z.strictObject({
   type: z.literal("transaction"),
   height: NonNegativeIntSchema,
-  outputs: z.array(OutputSchema),
+  outputs: z.array(OutputSchema).length(1),
 });
 
 const TransactionSchema = z.union([
@@ -143,7 +143,7 @@ const TransactionSchema = z.union([
 export const BlockSchema = z.strictObject({
   type: z.literal("block"),
   txids: z.array(TxidSchema),
-  nonce: LowerHexSchema.length(64),
+  nonce: LowerHexSchema.min(1).max(64),
   previd: z.union([TxidSchema, z.null()]),
   created: NonNegativeIntSchema,
   T: literal('00000000abc00000000000000000000000000000000000000000000000000000'),
