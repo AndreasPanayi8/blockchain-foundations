@@ -89,7 +89,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
 
       try {
         await objectManager.put(obj)
-        broadcast_ihaveobject(peerSockets, id, objectid);
+        broadcast_ihaveobject(id, objectid);
       } catch(err) {
         console.error(`[${id}]: object store failed`, err);
       }

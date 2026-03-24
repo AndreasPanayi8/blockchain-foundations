@@ -1,6 +1,7 @@
 import { type Message } from './types'
 import { Socket } from 'net'
 import canonicalize from 'canonicalize'
+import { peerSockets } from './node'
 
 // Networking helper functions
 
@@ -37,12 +38,22 @@ export async function connect(socket: Socket) {
   } as Message)
 }
 
-export async function broadcast_ihaveobject(peerSockets : Map<string, Socket>, exceptPeerId: string, objectid: string) {
+export async function broadcast_ihaveobject(exceptPeerId: string, objectid: string) {
   for (const [peerId, sock] of peerSockets.entries()) {
     if (peerId === exceptPeerId) continue;
     if (sock.destroyed) continue; 
     await send_message(sock, {
         type: 'ihaveobject',
+        objectid
+    } as Message);
+  }
+}
+
+export async function broadcast_getobject(objectid: string) {
+  for (const [_, sock] of peerSockets.entries()) {
+    if (sock.destroyed) continue; 
+    await send_message(sock, {
+        type: 'getobject',
         objectid
     } as Message);
   }

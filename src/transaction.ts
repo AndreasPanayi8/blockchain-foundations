@@ -1,14 +1,11 @@
 import type { Socket } from "net";
 import { RegularTransactionSchema, type Transaction } from "./types";
-import { send_error, } from "./networking";
+import { broadcast_getobject, send_error, } from "./networking";
 import { objectManager } from "./object";
 import canonicalize from "canonicalize";
 
 import { utf8ToBytes, hexToBytes} from '@noble/hashes/utils.js'
 import { verifyAsync } from "@noble/ed25519";
-
-
-
 
 export async function verifyTransaction(node_id : string, socket : Socket, t : Transaction): Promise<boolean> {
   const reg = RegularTransactionSchema.safeParse(t);
@@ -93,10 +90,16 @@ export async function verifyTransaction(node_id : string, socket : Socket, t : T
   return true
 }
 
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function get_transaction(txid: string) : Promise<Transaction> {
   const found = await objectManager.exists(txid);
   if(!found) {
-    throw new Error(`Transaction txid not found in database`);
+    await broadcast_getobject(txid);
+    await sleep(3000);
+    if(!(await objectManager.exists(txid))) throw new Error(`Transaction txid not found in database`);
   }
 
   try {
