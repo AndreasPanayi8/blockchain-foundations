@@ -50,7 +50,7 @@ export async function verifyTransaction(node_id : string, socket : Socket, t : T
     }
 
     try {
-      const inTransaction = await get_transaction(node_id, socket, txid);
+      const inTransaction = await get_transaction(txid);
 
       if (input.outpoint.index >= inTransaction.outputs.length) {
         await send_error(node_id, socket, 'INVALID_TX_OUTPOINT', 'The transaction outpoint index is too large');
@@ -74,7 +74,9 @@ export async function verifyTransaction(node_id : string, socket : Socket, t : T
       }
 
       inputSum += output.value;
-    } catch { 
+    } catch (e) {
+      console.error(`[${node_id}]: ` +  e);
+      send_error(node_id, socket, 'INVALID_FORMAT', `Transaction txid not found in database`);
       return false;
     }
   }
@@ -91,24 +93,21 @@ export async function verifyTransaction(node_id : string, socket : Socket, t : T
   return true
 }
 
-export async function get_transaction(node_id : string, socket : Socket, txid: string) : Promise<Transaction> {
+export async function get_transaction(txid: string) : Promise<Transaction> {
   const found = await objectManager.exists(txid);
   if(!found) {
-    await send_error(node_id, socket, 'UNFINDABLE_OBJECT', 'Transaction txid not found in database');
-    throw new Error();
+    throw new Error(`Transaction txid not found in database`);
   }
 
   try {
     const obj = await objectManager.get(txid);
   
     if (obj.type === 'block') {
-      await send_error(node_id, socket, 'INVALID_FORMAT', 'Transaction txid is a block id');
-      throw new Error();
+      throw new Error('Transaction txid is a block id');
     }
 
     return obj;
   } catch (err) { 
-    console.error(`[${node_id}]: get failed`, err);
-    throw new Error();
+    throw new Error(`Get failed`);
   }
 } 

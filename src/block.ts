@@ -11,22 +11,40 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
     return false;
   }
 
+  let UTXO = await utxoManager.getBaseState(block.previd);
+  if (UTXO === null) return true;
+
   let fee = 50;
   const firstTxid = block.txids[0];
   if (firstTxid === undefined) return false;
   try {
-    const firstTransaction = await get_transaction(node_id, socket, firstTxid);
+    const firstTransaction = await get_transaction(firstTxid);
 
     const c = CoinbaseTransactionSchema.safeParse(firstTransaction)
+
+    if (!c.success) {
+      const reg = RegularTransactionSchema.parse(firstTransaction);
+      for (const input of reg.inputs) {
+        try {
+          utxoManager.spendOutpoint(UTXO, outpointKey(input.outpoint.txid, input.outpoint.index));
+        }
+        catch {
+          await send_error(node_id, socket, 'INVALID_TX_OUTPOINT', 'Could not spend transaction\'s input');
+          return false;
+        }
+      }
+    }
+
+    utxoManager.addOutputs(UTXO, firstTxid, firstTransaction.outputs)
 
     for (let i = 1;i < block.txids.length;++i) {
       const txid = block.txids[i];
       if (txid === undefined) return false;
       
-      const t = await get_transaction(node_id, socket, txid);
+      const t = await get_transaction(txid);
       const reg = RegularTransactionSchema.safeParse(t);
       if(!reg.success) {
-        await send_error(node_id, socket, 'INVALID_BLOCK_COINBASE', 'Coinbase must be at 0 index in the block');
+        await send_error(node_id, socket, 'INVALID_BLOCK_COINBASE', 'Coinbase must be at 0');
         return false;
       }
       const transaction = reg.data;
@@ -37,68 +55,44 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
           return false;
         }
         if (c.success) {
-          const inTransaction = await get_transaction(node_id, socket, input.outpoint.txid);
+          const inTransaction = await get_transaction(input.outpoint.txid);
           const output = inTransaction.outputs[input.outpoint.index];
           if (output === undefined) return false; 
           fee += output.value;
         }
       }
 
-      if (c.success) {
-        const coinbase = c.data;
+      for (const output of transaction.outputs) {
+        fee -= output.value;
+      }
+      utxoManager.addOutputs(UTXO, txid, transaction.outputs);
+    }
 
-        for (const output of transaction.outputs) {
-          fee -= output.value;
-        }
+    if (c.success) {
+      const coinbase = c.data;
 
-        let coinbaseOut = 0;
-        for (const output of coinbase.outputs) {
-          coinbaseOut += output.value;
-        } 
+      let coinbaseOut = 0;
+      for (const output of coinbase.outputs) {
+        coinbaseOut += output.value;
+      } 
 
-        if (coinbaseOut > fee) {
-          await send_error(node_id, socket, 'INVALID_BLOCK_COINBASE', 'Coinbase\'s total output exceeded fees + reward');
-          return false;
-        }
+      if (coinbaseOut > fee) {
+        await send_error(node_id, socket, 'INVALID_BLOCK_COINBASE', 'Coinbase\'s total output exceeded fees + reward');
+        return false;
       }
     }
-  } catch { 
+  } catch (e) {
+    console.error(`[${node_id}]: ` +  e);
+    send_error(node_id, socket, 'UNFINDABLE_OBJECT', `Transaction txid not found in database`); 
     return false;
   }
 
   try {
-    let UTXO = await utxoManager.getBaseState(block.previd);
-    for (const txid of block.txids) {
-      const transaction = await get_transaction(node_id, socket, txid);
-
-      utxoManager.addOutputs(UTXO, txid, transaction.outputs)
-    }
-
-    for (const txid of block.txids) {
-      const t = await get_transaction(node_id, socket, txid);
-      const transaction = RegularTransactionSchema.safeParse(t);
-      if (!transaction.success) continue;
-      for (const input of transaction.data.inputs)
-        try {
-          utxoManager.spendOutpoint(UTXO, outpointKey(input.outpoint.txid, input.outpoint.index));
-        }
-        catch {
-          await send_error(node_id, socket, 'INVALID_TX_OUTPOINT', 'Could not spend transaction\'s input');
-          return false;
-        }
-    }
-
-    try {
-      utxoManager.put(block_id, UTXO);
-    } catch (e) {
-      console.error(`[${node_id}] utxo manager put failed`, e);
-      return false;
-    }
+    utxoManager.put(block_id, UTXO);
+  } catch (e) {
+    console.error(`[${node_id}] utxo manager put failed`, e);
+    return false;
   }
-  catch (e) {
-    // console.error(e);
-    return true;
-  }
-
+  
   return true;
 }
