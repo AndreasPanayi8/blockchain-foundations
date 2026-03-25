@@ -5,6 +5,11 @@ import { get_transaction } from "./transaction";
 import { outpointKey, utxoManager } from "./utxo";
  
 export async function verifyBlock(node_id : string, socket : Socket, block : Block, block_id : string) : Promise<boolean> {
+  if (block.previd === null && block_id !== '00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6') {
+    await send_error(node_id, socket, 'INVALID_GENESIS', 'Previous block is null but the block is not the genesis block');
+    return false;
+  } 
+  
   if (BigInt('0x' + block_id) >= BigInt('0x' + block.T)) {
     await send_error(node_id, socket, 'INVALID_BLOCK_POW', 'Proof of work failed');
     return false;
