@@ -10,6 +10,8 @@ import { verifyBlock } from './block'
 const PORT = 18018
 const SERVER_ID = '95.179.176.219:' + PORT
 
+const banned_ips = ['::ffff:95.179.178.136']
+
 async function handle_message(socket: Socket, id: string, message: Message) {
   switch (message.type) {
     case 'getpeers':
@@ -180,11 +182,13 @@ let discovered_peers = get_peers();
 export const peerSockets = new Map<string, Socket>();
 
 const server = createServer(async (socket) => {
+  if (socket.remoteAddress !== undefined && !banned_ips.includes(socket.remoteAddress)) {
     const id = `${socket.remoteAddress}:${socket.remotePort}`
     console.log(`Client connected from ${id}`)
 
    attach_handlers(socket, id)
    await connect(socket)
+  }
 })
 
 async function connect_to_random_discovered_peer() {
