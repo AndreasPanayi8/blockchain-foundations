@@ -97,6 +97,7 @@ async function sleep(ms: number) {
 export async function get_transaction(txid: string) : Promise<Transaction> {
   const found = await objectManager.exists(txid);
   if(!found) {
+    console.log('Txid ' + txid + 'not found, sendign get_object to peers');
     await broadcast_getobject(txid);
     await sleep(3000);
     if(!(await objectManager.exists(txid))) throw new Error(`Transaction txid not found in database`);

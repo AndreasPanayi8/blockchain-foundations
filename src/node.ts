@@ -8,7 +8,7 @@ import { verifyTransaction } from './transaction'
 import { verifyBlock } from './block'
 
 const PORT = 18018
-const SERVER_ID = '95.179.176.219:'+PORT
+const SERVER_ID = '95.179.176.219:' + PORT
 
 async function handle_message(socket: Socket, id: string, message: Message) {
   switch (message.type) {
@@ -75,18 +75,27 @@ async function handle_message(socket: Socket, id: string, message: Message) {
 
       const objectid = objectManager.objectId(obj);
 
+      console.log(`[${id}]: Recieved object ` + objectid);
+
       const known = await objectManager.exists(objectid);
       if (known) return;
 
       switch (obj.type) {
         case 'transaction':
-          if (!(await verifyTransaction(id, socket, obj))) return;
+          if (!(await verifyTransaction(id, socket, obj))) {
+            console.log(`[${id}]: Transaction verification failed`);
+            return
+          };
           break;
         case 'block':
-          if (!(await verifyBlock(id, socket, obj, objectid))) return;
+          if (!(await verifyBlock(id, socket, obj, objectid))) {
+            console.log(`[${id}]: Block verification failed`);
+            return;
+          } 
           break
       }
 
+      console.log(`[${id}]: Veryfication succeded, storing object`)
       try {
         await objectManager.put(obj)
         broadcast_ihaveobject(id, objectid);
