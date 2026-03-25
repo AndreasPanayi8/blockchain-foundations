@@ -8,7 +8,8 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-const IP = '127.0.0.1';
+// const IP = '127.0.0.1';
+const IP = '95.179.176.219';
 const PORT = 18018;
 
 const grader = new Socket();
@@ -62,9 +63,8 @@ grader.connect(PORT, IP, async () => {
 
   for (const testcase of testcases) {
     console.log('Sending: ' + JSON.stringify(testcase.msg));
+    if(grader.destroyed) return;
     grader.write(canonicalize(testcase.msg) + '\n');
-    await sleep(1000)
+    await sleep(testcase.ms);
   }
-
-  grader.end();
 })
