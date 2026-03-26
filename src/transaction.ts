@@ -47,7 +47,7 @@ export async function verifyTransaction(node_id : string, socket : Socket, t : T
     }
 
     try {
-      const inTransaction = await get_transaction(txid);
+      const inTransaction = await get_transaction(txid, false);
 
       if (input.outpoint.index >= inTransaction.outputs.length) {
         await send_error(node_id, socket, 'INVALID_TX_OUTPOINT', 'The transaction outpoint index is too large');
@@ -73,7 +73,7 @@ export async function verifyTransaction(node_id : string, socket : Socket, t : T
       inputSum += output.value;
     } catch (e) {
       console.error(`[${node_id}]: ` +  e);
-      send_error(node_id, socket, 'UNFINDABLE_OBJECT', `Transaction txid not found in database`);
+      send_error(node_id, socket, 'UNKNOWN_OBJECT', `Transaction txid not found in database`);
       return false;
     }
   }
@@ -94,12 +94,14 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function get_transaction(txid: string) : Promise<Transaction> {
+export async function get_transaction(txid: string, search_peers: boolean = true) : Promise<Transaction> {
   const found = await objectManager.exists(txid);
   if(!found) {
-    console.log('Txid ' + txid + 'not found, sendign get_object to peers');
-    await broadcast_getobject(txid);
-    await sleep(3000);
+    if (search_peers) {
+      console.log('Txid ' + txid + 'not found, sendign get_object to peers');
+      await broadcast_getobject(txid);
+      await sleep(3000);
+    }
     if(!(await objectManager.exists(txid))) throw new Error(`Transaction txid not found in database`);
   }
 
