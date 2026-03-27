@@ -2,7 +2,7 @@ import type { Socket } from "net";
 import{CoinbaseTransactionSchema, RegularTransactionSchema, type Block} from "./types";
 import { send_error } from "./networking";
 import { get_transaction } from "./transaction";
-import { outpointKey, utxoManager } from "./utxo";
+import { outpointKey, utxoManager, type UTXOEntry } from "./utxo";
  
 export async function verifyBlock(node_id : string, socket : Socket, block : Block, block_id : string) : Promise<boolean> {
   if (block.previd === null && block_id !== '00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6') {
@@ -68,22 +68,14 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
             return false;
           }
 
-          // Spend the transaction outpoint
+          let spent: UTXOEntry;
           try {
-            utxoManager.spendOutpoint(UTXO, outpointKey(input.outpoint.txid, input.outpoint.index));
-          }
-          catch {
-            await send_error(node_id, socket, 'INVALID_TX_OUTPOINT', 'Could not spend transaction\'s input');
+            spent = utxoManager.spendOutpoint(UTXO, outpointKey(input.outpoint.txid, input.outpoint.index));
+          } catch {
+            await send_error(node_id, socket, 'INVALID_TX_OUTPOINT', "Could not spend transaction's input");
             return false;
           }
-          
-          if (c.success) {
-            // Collect the fee from the inputs
-            const inTransaction = await get_transaction(input.outpoint.txid);
-            const output = inTransaction.outputs[input.outpoint.index];
-            if (output === undefined) return false; 
-            fee += output.value;
-          }
+          if (c.success) fee += spent.value;
         }
 
         for (const output of transaction.outputs) {

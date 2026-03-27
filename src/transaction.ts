@@ -73,7 +73,7 @@ export async function verifyTransaction(node_id : string, socket : Socket, t : T
       inputSum += output.value;
     } catch (e) {
       console.error(`[${node_id}]: ` +  e);
-      send_error(node_id, socket, 'UNKNOWN_OBJECT', `Transaction txid not found in database`);
+      await send_error(node_id, socket, 'UNKNOWN_OBJECT', `Transaction txid not found in database`);
       return false;
     }
   }
@@ -90,30 +90,14 @@ export async function verifyTransaction(node_id : string, socket : Socket, t : T
   return true
 }
 
-async function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-export async function get_transaction(txid: string, search_peers: boolean = true) : Promise<Transaction> {
-  const found = await objectManager.exists(txid);
-  if(!found) {
-    if (search_peers) {
-      console.log('Txid ' + txid + 'not found, sendign get_object to peers');
-      await broadcast_getobject(txid);
-      await sleep(3000);
-    }
-    if(!(await objectManager.exists(txid))) throw new Error(`Transaction txid not found in database`);
-  }
-
-  try {
+export async function get_transaction(txid: string, search_peers: boolean = true): Promise<Transaction> {
+  if (!search_peers) {
     const obj = await objectManager.get(txid);
-  
-    if (obj.type === 'block') {
-      throw new Error('Transaction txid is a block id');
-    }
-
+    if (obj.type === 'block') throw new Error('txid refers to a block, not a transaction');
     return obj;
-  } catch (err) { 
-    throw new Error(`Get failed`);
   }
-} 
+
+  const obj = await objectManager.find(txid, (id) => { broadcast_getobject(id); });
+  if (obj.type === 'block') throw new Error('txid refers to a block, not a transaction');
+  return obj;
+}
