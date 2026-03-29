@@ -1,127 +1,100 @@
-import type { Socket } from "net";
-import{CoinbaseTransactionSchema, RegularTransactionSchema, type Block} from "./types";
-import { send_error } from "./networking";
-import { get_transaction } from "./transaction";
-import { outpointKey, utxoManager } from "./utxo";
- 
-export async function verifyBlock(node_id : string, socket : Socket, block : Block, block_id : string) : Promise<boolean> {
-  if (block.previd === null && block_id !== '00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6') {
-    await send_error(node_id, socket, 'INVALID_GENESIS', 'Previous block is null but the block is not the genesis block');
-    return false;
-  } 
-  
-  if (BigInt('0x' + block_id) >= BigInt('0x' + block.T)) {
-    await send_error(node_id, socket, 'INVALID_BLOCK_POW', 'Proof of work failed');
-    return false;
-  }
+import { Level } from "level";
+import canonicalize from "canonicalize";
+import { utf8ToBytes } from "@noble/hashes/utils.js";
+import { blake2s } from "@noble/hashes/blake2.js";
+import { bytesToHex } from "@noble/hashes/utils.js";
+import type { NetworkObject } from "./types";
 
-  let UTXO = await utxoManager.getBaseState(block.previd);
-  if (UTXO === null) return false;  // If the previous block is not in the database it is ingored
-  
-  if (block.txids.length > 0) {
-    let fee = 50_000_000_000_000;
 
-    // First transaction validation
-    const firstTxid = block.txids[0];
-    if (firstTxid === undefined) return false;
-    try {
-      const firstTransaction = await get_transaction(firstTxid);
+const FIND_TIMEOUT_MS = 5000
 
-      const c = CoinbaseTransactionSchema.safeParse(firstTransaction)
-
-      if (!c.success) {
-        // If the first transaction is not a coinbase spend its inputs
-        const reg = RegularTransactionSchema.parse(firstTransaction);
-        for (const input of reg.inputs) {
-          try {
-            utxoManager.spendOutpoint(UTXO, outpointKey(input.outpoint.txid, input.outpoint.index));
-          }
-          catch {
-            await send_error(node_id, socket, 'INVALID_TX_OUTPOINT', 'Could not spend transaction\'s input');
-            return false;
-          }
-        }
-      }
-
-      // Create transaction's outputs
-      utxoManager.addOutputs(UTXO, firstTxid, firstTransaction.outputs)
-
-      // Validate the rest transactions
-      for (let i = 1;i < block.txids.length;++i) {
-        const txid = block.txids[i];
-        if (txid === undefined) return false;
-        
-        const t = await get_transaction(txid);
-        const reg = RegularTransactionSchema.safeParse(t);
-        
-        if(!reg.success) {
-          // The transaction is a coinbase
-          await send_error(node_id, socket, 'INVALID_BLOCK_COINBASE', 'Coinbase must be at 0');
-          return false;
-        }
-        
-        const transaction = reg.data;
-
-        for (const input of transaction.inputs) {
-          if (c.success && input.outpoint.txid === firstTxid) {
-            await send_error(node_id, socket, 'INVALID_TX_OUTPOINT', 'Coinbase cannot be spent in its block');
-            return false;
-          }
-
-          // Spend the transaction outpoint
-          try {
-            utxoManager.spendOutpoint(UTXO, outpointKey(input.outpoint.txid, input.outpoint.index));
-          }
-          catch {
-            await send_error(node_id, socket, 'INVALID_TX_OUTPOINT', 'Could not spend transaction\'s input');
-            return false;
-          }
-          
-          if (c.success) {
-            // Collect the fee from the inputs
-            const inTransaction = await get_transaction(input.outpoint.txid);
-            const output = inTransaction.outputs[input.outpoint.index];
-            if (output === undefined) return false; 
-            fee += output.value;
-          }
-        }
-
-        for (const output of transaction.outputs) {
-          // Reduce the fee by the amount spend
-          fee -= output.value;
-        }
-        
-        // Create transaction's outputs
-        utxoManager.addOutputs(UTXO, txid, transaction.outputs);
-      }
-
-      if (c.success) {
-        // Check for law of conservation for the coinbase transaction, if it exists
-        const coinbase = c.data;
-
-        let coinbaseOut = 0;
-        for (const output of coinbase.outputs) {
-          coinbaseOut += output.value;
-        } 
-
-        if (coinbaseOut > fee) {
-          await send_error(node_id, socket, 'INVALID_BLOCK_COINBASE', 'Coinbase\'s total output exceeded fees + reward');
-          return false;
-        }
-      }
-    } catch (e) {
-      console.error(`[${node_id}]: ` +  e);
-      await send_error(node_id, socket, 'UNFINDABLE_OBJECT', `Transaction txid not found in database`); 
-      return false;
-    }
-  }
-
-  try {
-    await utxoManager.put(block_id, UTXO);
-  } catch (e) {
-    console.error(`[${node_id}] utxo manager put failed`, e);
-    return false;
-  }
-  
-  return true;
+type Waiter = {
+    resolve: (obj: NetworkObject) => void;
+    reject: (err: Error) => void;
+    timer: ReturnType< typeof setTimeout>;
 }
+
+export class ObjectManager{
+    private db = new Level<string, NetworkObject>("./storage/objects",{
+        valueEncoding: "json"   
+    });
+
+    private pending: Map<string, Waiter[]> = new Map();
+    private requested = new Set<string>();
+    
+
+    objectId(object: NetworkObject): string{
+        const c = canonicalize(object);
+        if (!c) throw new Error("Failed to canonicalize object");
+        return bytesToHex(blake2s(utf8ToBytes(c)));
+    }
+
+    async exists(objectid: string): Promise<boolean>{
+        return await this.db.has(objectid);
+    }
+
+    async get(objectid: string): Promise<NetworkObject>{
+        //Level throws if missing
+        try{
+            return await this.db.get(objectid);
+        } catch {
+            throw new Error(`Object ${objectid} not found`);
+        }
+        
+    }
+
+    async put(object: NetworkObject): Promise<string>{
+        const id = this.objectId(object);
+        // Store under its content-derived id
+        await this.db.put(id, object);
+
+        const waiters = this.pending.get(id);
+        if (waiters) {
+            for (const w of waiters) {
+                clearTimeout(w.timer);
+                w.resolve(object);
+            }
+            this.pending.delete(id);
+        }
+        this.requested.delete(id);
+        return id;
+    }
+
+    async find(objectid: string, requestFn: (id: string) => void): Promise<NetworkObject>{
+        if (await this.exists(objectid)) {
+            return await this.get(objectid);
+        }
+        if(!this.requested.has(objectid)){
+            this.requested.add(objectid);
+            requestFn(objectid);
+        }
+
+        //Wait for it or timeout
+        return await new Promise<NetworkObject>((resolve, reject) => {
+        const timer = setTimeout(() => {
+        const arr = this.pending.get(objectid);
+        if (arr) {
+          const idx = arr.findIndex((w) => w.resolve === resolve);
+          if (idx >= 0) arr.splice(idx, 1);
+          if (arr.length === 0) this.pending.delete(objectid);
+        }
+        this.requested.delete(objectid);
+        reject(new Error(`Timeout waiting for object ${objectid}`));
+      }, FIND_TIMEOUT_MS);
+
+      const waiter: Waiter = { resolve, reject, timer };
+      const arr = this.pending.get(objectid);
+      if (arr) arr.push(waiter);
+      else this.pending.set(objectid, [waiter]);
+    });
+  }
+}
+
+
+
+export const objectManager = new ObjectManager();
+
+    
+
+
+
