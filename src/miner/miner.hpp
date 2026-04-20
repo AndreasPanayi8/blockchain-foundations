@@ -4,21 +4,13 @@
 
 class Miner {
   private:
-    static const std::string T;
-    static const std::string NAME;
-    static const std::string STUDENT_IDS;
-    const std::string timestamp;
-    const std::string previd;
-    const std::string txids;
-    std::string nonce;
-
     std::string objectStr;
   public:
-    Miner(std::string previd, std::string txids);
+    Miner(std::string objectStr);
     void increment_nonce();
-    bool chech_pow();
+    bool chech_pow() const;
 
-    std::string get_object_str();
+    std::string get_object_str() const;
 };
 
 #endif // MINER_HPP

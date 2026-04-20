@@ -1,3 +1,6 @@
+src/miner/*.o
+src/miner/miner
+
 # dependencies (bun install)
 node_modules
 
