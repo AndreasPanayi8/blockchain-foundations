@@ -1,14 +1,16 @@
 #include "miner.hpp"
 #include <stdlib.h>
 #include <blake2.h>
-
+#include <random>
 
 const int NONCE_OFFSET = 129;
 const int NONCE_SIZE = 64;
 
 void randomize_nonce(char *objectStr) {
+  std::mt19937 generator(std::random_device{}());
+  std::uniform_int_distribution<int> distribution(0, 15);
   for (int i = NONCE_OFFSET; i < NONCE_OFFSET + NONCE_SIZE;++i) {
-    int num = std::rand() % 16;
+    int num = distribution(generator);
     if (num >= 10) {
       num -= 10;
       objectStr[i] = 'a' + num; 
