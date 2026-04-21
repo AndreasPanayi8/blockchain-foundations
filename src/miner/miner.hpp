@@ -1,16 +1,9 @@
 #ifndef MINER_HPP
 #define MINER_HPP
-#include <string>
+#include <cstdlib>
 
-class Miner {
-  private:
-    std::string objectStr;
-  public:
-    Miner(std::string objectStr);
-    void increment_nonce();
-    bool chech_pow() const;
-
-    std::string get_object_str() const;
-};
+void randomize_nonce(char *objectStr);
+void increment_nonce(char *objectStr);
+bool chech_pow(const char *objectStr, size_t len);
 
 #endif // MINER_HPP
