@@ -31,8 +31,11 @@ int main() {
   int n = 16;
   std::vector<std::thread> threads;
 
+  char* objectStrs[n];
   for (int i = 0; i < n; ++i) {
-      threads.emplace_back(mine, objectStr, len);
+      objectStrs[i] = new char[len +1];
+      std::strcpy(objectStrs[i], objectStr);
+      threads.emplace_back(mine, objectStrs[i], len);
   }
 
   auto last_time = std::chrono::steady_clock::now();
