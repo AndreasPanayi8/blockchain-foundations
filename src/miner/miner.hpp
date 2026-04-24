@@ -1,9 +1,16 @@
 #ifndef MINER_HPP
 #define MINER_HPP
-#include <cstdlib>
+#include "./blake2.h"
 
-void randomize_nonce(char *objectStr);
-void increment_nonce(char *objectStr);
-bool chech_pow(const char *objectStr, size_t len);
+struct Object {
+  unsigned long long nonce[4];
+  char postfix[992];
+};
+
+void initialize_object(Object &object, const char *postfix, size_t len);
+
+void increment_nonce(Object &object);
+
+bool check_pow(const Object &object, const blake2s_state &state, size_t len);
 
 #endif // MINER_HPP
