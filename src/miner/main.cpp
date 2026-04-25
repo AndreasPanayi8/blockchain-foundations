@@ -9,6 +9,7 @@
 #include <vector>
 #include <functional>
 #include "./blake2.h"
+#include "client.hpp"
 
 void mine(int i, const char *object_postfix, size_t len, const blake2s_state &state, int &found, std::atomic<uint64_t> &cnt) {
   alignas(64) Object obj;
@@ -25,6 +26,9 @@ void mine(int i, const char *object_postfix, size_t len, const blake2s_state &st
 }
 
 int main() {
+  Client::connect();
+  Client::quit();
+
   char objectStr[] = "{\"object\":{\"T\":\"00000000abc00000000000000000000000000000000000000000000000000000\",\"created\":1771170155,\"miner\":\"grader\",\"nonce\":\"fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0\",\"previd\":\"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6\",\"txids\":[\"6e77eb8eb23aa6c6dfb28ac72b38116d4826c6a96299199ae0013654bc71a5fb\"],\"type\":\"block\"},\"type\":\"object\"}";
   size_t len = std::strlen(objectStr) - 129;
 
