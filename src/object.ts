@@ -4,7 +4,7 @@ import { utf8ToBytes } from "@noble/hashes/utils.js";
 import { blake2s } from "@noble/hashes/blake2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import type { NetworkObject } from "./types";
-import { object } from "zod";
+
 
 const FIND_TIMEOUT_MS = 5000
 
@@ -56,7 +56,7 @@ export class ObjectManager{
             }
             this.pending.delete(id);
         }
-
+        this.requested.delete(id);
         return id;
     }
 

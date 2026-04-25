@@ -73,7 +73,7 @@ export async function verifyTransaction(node_id : string, socket : Socket, t : T
       inputSum += output.value;
     } catch (e) {
       console.error(`[${node_id}]: ` +  e);
-      send_error(node_id, socket, 'UNKNOWN_OBJECT', `Transaction txid not found in database`);
+      await send_error(node_id, socket, 'UNKNOWN_OBJECT', `Transaction txid not found in database`);
       return false;
     }
   }
