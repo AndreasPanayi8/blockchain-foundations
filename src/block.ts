@@ -19,44 +19,6 @@ async function findParentBlock(previd: string) : Promise<NetworkObject | null> {
   }
 }
 
-async function findMissingAncestorPath(
-  block: Block
-): Promise<Array<{ block: Block; blockid: string }> | null> {
-  const path: Array<{ block: Block; blockid: string }> = [];
-
-  let current = block;
-
-  while (current.previd !== null) {
-    if (await utxoManager.exists(current.previd)) {
-      return path.reverse();
-    }
-
-    const parent = await findParentBlock(current.previd);
-
-    if (parent === null || parent.type !== "block") {
-      return null;
-    }
-
-    const parentBlockId = current.previd;
-
-    if (BigInt("0x" + parentBlockId) >= BigInt("0x" + parent.T)) {
-      return null;
-    }
-
-    path.push({ block: parent, blockid: parentBlockId });
-    current = parent;
-  }
-
-  if (block.previd === null) {
-    return [];
-  }
-
-  if (objectManager.objectId(current) === GENESIS_BLOCK_ID) {
-    return path.reverse();
-  }
-
-  return null;
-}
 
 
 async function validateBlockLocal(node_id : string, socket : Socket, block : Block, block_id : string) : Promise<boolean> {
@@ -188,40 +150,27 @@ export async function verifyBlock(
   block: Block,
   block_id: string
 ): Promise<boolean> {
-  const missingAncestors = await findMissingAncestorPath(block);
+  if (block.previd !== null && !(await utxoManager.exists(block.previd))) {
+    const parent = await findParentBlock(block.previd);
 
-  if (missingAncestors === null) {
-    await send_error(
-      node_id,
-      socket,
-      "UNFINDABLE_OBJECT",
-      "Could not find valid predecessor chain"
-    );
-    return false;
-  }
-
-    for (const ancestor of missingAncestors) {
-    if (!(await utxoManager.exists(ancestor.blockid))) {
-      const ok = await validateBlockLocal(
+    if (parent === null || parent.type !== "block") {
+      await send_error(
         node_id,
         socket,
-        ancestor.block,
-        ancestor.blockid
+        "UNFINDABLE_OBJECT",
+        "Could not find predecessor block"
       );
-
-      if (!ok) {
-        await send_error(
-          node_id,
-          socket,
-          "UNFINDABLE_OBJECT",
-          "Could not validate predecessor chain"
-        );
-        return false;
-      }
+      return false;
     }
 
-    if (!(await objectManager.exists(ancestor.blockid))) {
-      await objectManager.put(ancestor.block);
+    if (!(await utxoManager.exists(block.previd))) {
+      await send_error(
+        node_id,
+        socket,
+        "UNFINDABLE_OBJECT",
+        "Could not validate predecessor chain"
+      );
+      return false;
     }
   }
 
