@@ -10,7 +10,7 @@
 namespace Client {
   // const char HOST[] = "95.179.176.219";
   const char HOST[] = "127.0.0.1";
-  const int PORT = 18018;
+  const int PORT = 1302;
 
   int sock = 0;
 

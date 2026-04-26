@@ -227,7 +227,7 @@ async function connect_to_random_discovered_peer() {
 }
 
 // Start the server
-server.listen(PORT, async() => {
-    console.log(`Server listening on port ${PORT}`)
-    await connect_to_random_discovered_peer()
-})
+// server.listen(PORT, async() => {
+//     console.log(`Server listening on port ${PORT}`)
+//     // await connect_to_random_discovered_peer()
+// })

@@ -157,7 +157,7 @@ const NetworkObjectSchema = z.union([
   BlockSchema,
 ]);
 
-const ObjectMessageSchema = z.strictObject({
+export const ObjectMessageSchema = z.strictObject({
   type: z.literal("object"),
   object: NetworkObjectSchema,
 });
