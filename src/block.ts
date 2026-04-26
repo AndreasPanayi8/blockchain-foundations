@@ -4,8 +4,9 @@ import { send_error, broadcast_getobject } from "./networking";
 import { get_transaction } from "./transaction";
 import { outpointKey, utxoManager, type UTXOEntry } from "./utxo";
 import { objectManager } from "./object";
+import { chain_data } from "./chain";
 
-const GENESIS_BLOCK_ID =
+export const GENESIS_BLOCK_ID =
   "00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6";
 
 
@@ -19,7 +20,21 @@ async function findParentBlock(previd: string) : Promise<NetworkObject | null> {
   }
 }
 
+async function get_object_height(block: Block, block_id: string) : Promise<number> {
+  let height = 0;
+  let curBlock = block;
 
+  while(curBlock.previd != null) {
+    const prev = await findParentBlock(curBlock.previd);
+    if (prev !== null && prev.type === 'block') {
+      curBlock = prev;
+      height++;
+    }
+  }
+
+  chain_data.update(block_id, height);
+  return height;
+}
 
 async function validateBlockLocal(node_id : string, socket : Socket, block : Block, block_id : string) : Promise<boolean> {
   if (block.previd === null && block_id !== GENESIS_BLOCK_ID) {
