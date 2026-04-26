@@ -1,11 +1,28 @@
 import type { Socket } from "net";
-import{CoinbaseTransactionSchema, RegularTransactionSchema, type Block} from "./types";
-import { send_error } from "./networking";
+import{CoinbaseTransactionSchema, RegularTransactionSchema, type Block, type NetworkObject} from "./types";
+import { send_error, broadcast_getobject } from "./networking";
 import { get_transaction } from "./transaction";
 import { outpointKey, utxoManager, type UTXOEntry } from "./utxo";
- 
-export async function verifyBlock(node_id : string, socket : Socket, block : Block, block_id : string) : Promise<boolean> {
-  if (block.previd === null && block_id !== '00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6') {
+import { objectManager } from "./object";
+
+const GENESIS_BLOCK_ID =
+  "00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6";
+
+
+async function findParentBlock(previd: string) : Promise<NetworkObject | null> {
+  try{
+    return await objectManager.find(previd, async (id) => {
+      await broadcast_getobject(id);
+    });
+  } catch {
+    return null;
+  }
+}
+
+
+
+async function validateBlockLocal(node_id : string, socket : Socket, block : Block, block_id : string) : Promise<boolean> {
+  if (block.previd === null && block_id !== GENESIS_BLOCK_ID) {
     await send_error(node_id, socket, 'INVALID_GENESIS', 'Previous block is null but the block is not the genesis block');
     return false;
   } 
@@ -16,8 +33,17 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
   }
 
   let UTXO = await utxoManager.getBaseState(block.previd);
-  if (UTXO === null) return false;  // If the previous block is not in the database it is ingored
+  if (UTXO === null) {
+    await send_error(
+      node_id,
+      socket,
+      "UNFINDABLE_OBJECT",
+      "Parent block's UTXO not found"
+    );
+    return false;
+  }  // If the previous block is not in the database it is ingored
   
+
   if (block.txids.length > 0) {
     let fee = 50_000_000_000_000;
 
@@ -116,4 +142,37 @@ export async function verifyBlock(node_id : string, socket : Socket, block : Blo
   }
   
   return true;
+}
+
+export async function verifyBlock(
+  node_id: string,
+  socket: Socket,
+  block: Block,
+  block_id: string
+): Promise<boolean> {
+  if (block.previd !== null && !(await utxoManager.exists(block.previd))) {
+    const parent = await findParentBlock(block.previd);
+
+    if (parent === null || parent.type !== "block") {
+      await send_error(
+        node_id,
+        socket,
+        "UNFINDABLE_OBJECT",
+        "Could not find predecessor block"
+      );
+      return false;
+    }
+
+    if (!(await utxoManager.exists(block.previd))) {
+      await send_error(
+        node_id,
+        socket,
+        "UNFINDABLE_OBJECT",
+        "Could not validate predecessor chain"
+      );
+      return false;
+    }
+  }
+
+  return await validateBlockLocal(node_id, socket, block, block_id);
 }
