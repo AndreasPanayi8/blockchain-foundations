@@ -3,9 +3,10 @@ import { type Message, MessageSchema } from './types'
 import { add_peer, get_peers } from './peers'
 import { objectManager } from './object'
 
-import { send_message, send_error, connect, broadcast_ihaveobject, parse_peer_address} from './networking'
+import { send_message, send_error, connect, broadcast_ihaveobject, parse_peer_address, broadcast_getobject} from './networking'
 import { verifyTransaction } from './transaction'
 import { verifyBlock } from './block'
+import { chain_data } from './chain'
 
 const PORT = 18018
 const SERVER_ID = '95.179.176.219:' + PORT
@@ -107,6 +108,17 @@ async function handle_message(socket: Socket, id: string, message: Message) {
 
       break;
     }
+    case 'getchaintip':
+      await send_message(socket, {
+        type:'chaintip',
+        blockid: chain_data.get_chaintip()
+      } as Message)
+      break
+    case 'chaintip':
+      if (!(await objectManager.exists(message.blockid))) {
+        await broadcast_getobject(message.blockid);
+      }
+      break
 
     case 'error':
       console.log(`[${id}]: Recieved error: ${message.name} - ${message.description}`)  
@@ -229,5 +241,5 @@ async function connect_to_random_discovered_peer() {
 // Start the server
 server.listen(PORT, async() => {
     console.log(`Server listening on port ${PORT}`)
-    await connect_to_random_discovered_peer()
+    // await connect_to_random_discovered_peer()
 })

@@ -36,6 +36,10 @@ export async function connect(socket: Socket) {
   await send_message(socket, {
       type: 'getpeers'
   } as Message)
+
+  await send_message(socket, {
+    type: 'getchaintip'
+  } as Message)
 }
 
 export async function broadcast_ihaveobject(exceptPeerId: string, objectid: string) {
