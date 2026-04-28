@@ -5,6 +5,7 @@ import { get_transaction } from "./transaction";
 import { outpointKey, utxoManager, type UTXOEntry } from "./utxo";
 import { objectManager } from "./object";
 import { chain_data } from "./chain";
+import { heightManager } from "./height";
 
 export const GENESIS_BLOCK_ID =
   "00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6";
@@ -20,23 +21,74 @@ async function findParentBlock(previd: string) : Promise<NetworkObject | null> {
   }
 }
 
-async function get_object_height(block: Block, block_id: string) : Promise<number> {
-  let height = 0;
-  let curBlock = block;
-
-  while(curBlock.previd != null) {
-    const prev = await findParentBlock(curBlock.previd);
-    if (prev !== null && prev.type === 'block') {
-      curBlock = prev;
-      height++;
-    }
+async function get_object_height(block: Block, block_id: string): Promise<number | null> {
+  if (await heightManager.exists(block_id)) {
+    return await heightManager.get(block_id);
   }
 
-  chain_data.update(block_id, height);
-  return height;
+  if (block.previd === null) {
+    if (block_id !== GENESIS_BLOCK_ID) {
+      return null;
+    }
+
+    return 0;
+  }
+
+  if (!(await heightManager.exists(block.previd))) {
+    return null;
+  }
+
+  const parentHeight = await heightManager.get(block.previd);
+  return parentHeight + 1;
 }
 
-async function validateBlockLocal(node_id : string, socket : Socket, block : Block, block_id : string) : Promise<boolean> {
+async function validate_block_timestamp(
+  node_id: string,
+  socket: Socket,
+  block: Block,
+  block_id: string
+): Promise<boolean> {
+  const now = Math.floor(Date.now() / 1000);
+
+  if (block.created >= now) {
+    await send_error(
+      node_id,
+      socket,
+      "INVALID_BLOCK_TIMESTAMP",
+      "Block timestamp is not earlier than current time"
+    );
+    return false;
+  }
+
+  if (block.previd === null) {
+    if (block_id !== GENESIS_BLOCK_ID) {
+      await send_error(
+        node_id,
+        socket,
+        "INVALID_GENESIS",
+        "Block has null previd but is not genesis"
+      );
+      return false;
+    }
+    return true;
+  }
+
+  const parent = await objectManager.get(block.previd) as Block;
+
+  if (block.created <= parent.created) {
+    await send_error(
+      node_id,
+      socket,
+      "INVALID_BLOCK_TIMESTAMP",
+      "Block timestamp is not later than parent timestamp"
+    );
+    return false;
+  }
+
+  return true;
+}
+
+async function validateBlockLocal(node_id: string, socket: Socket, block: Block, block_id: string, height: number ): Promise<boolean>{
   if (block.previd === null && block_id !== GENESIS_BLOCK_ID) {
     await send_error(node_id, socket, 'INVALID_GENESIS', 'Previous block is null but the block is not the genesis block');
     return false;
@@ -69,6 +121,16 @@ async function validateBlockLocal(node_id : string, socket : Socket, block : Blo
       const firstTransaction = await get_transaction(firstTxid);
 
       const c = CoinbaseTransactionSchema.safeParse(firstTransaction)
+      
+      if (c.success && c.data.height !== height) {
+        await send_error(
+          node_id,
+          socket,
+          "INVALID_BLOCK_COINBASE",
+          "Coinbase height does not match block height"
+        );
+        return false;
+      }
 
       if (!c.success) {
         // If the first transaction is not a coinbase spend its inputs
@@ -151,8 +213,9 @@ async function validateBlockLocal(node_id : string, socket : Socket, block : Blo
 
   try {
     await utxoManager.put(block_id, UTXO);
+    await heightManager.put(block_id, height);
   } catch (e) {
-    console.error(`[${node_id}] utxo manager put failed`, e);
+    console.error(`[${node_id}] utxo/height manager put failed`, e);
     return false;
   }
   
@@ -189,5 +252,21 @@ export async function verifyBlock(
     }
   }
 
-  return await validateBlockLocal(node_id, socket, block, block_id);
+  if (!(await validate_block_timestamp(node_id, socket, block, block_id))) {
+    return false;
+  }
+
+  const height = await get_object_height(block, block_id);
+
+  if (height === null) {
+    await send_error(
+      node_id,
+      socket,
+      "UNFINDABLE_OBJECT",
+      "Could not compute block height"
+    );
+    return false;
+  }
+
+  return await validateBlockLocal(node_id, socket, block, block_id, height);
 }

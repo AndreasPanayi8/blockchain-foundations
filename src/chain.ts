@@ -32,7 +32,7 @@ class ChainData {
     const data = JSON.parse(rawData)
 
     this.chain_height = data.chain_height;
-    this.chaintip = data.chain_height;
+    this.chaintip = data.chaintip;
 
   }
 
