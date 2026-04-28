@@ -6,10 +6,7 @@ import { outpointKey, utxoManager, type UTXOEntry } from "./utxo";
 import { objectManager } from "./object";
 import { chain_data } from "./chain";
 import { heightManager } from "./height";
-
-export const GENESIS_BLOCK_ID =
-  "00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6";
-
+import { GENESIS_BLOCK_ID } from "./types";
 
 async function findParentBlock(previd: string): Promise<NetworkObject | null> {
   try {

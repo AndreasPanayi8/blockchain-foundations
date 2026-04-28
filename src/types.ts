@@ -1,5 +1,8 @@
 import z, { literal, object } from 'zod'
 
+export const GENESIS_BLOCK_ID =
+  "00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6";
+
 const Hash32Schema = z.string().regex(/^[0-9a-f]{64}$/);
 const LowerHexSchema = z.string().regex(/^[0-9a-f]+$/, "must be lowercase hex");
 const NonNegativeIntSchema = z.int().nonnegative();

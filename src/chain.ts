@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from "path";
-import { GENESIS_BLOCK_ID } from './block';
+import { GENESIS_BLOCK_ID } from "./types";
 
 const FILENAME = './storage/chaintip.txt'
 const k = 6;
