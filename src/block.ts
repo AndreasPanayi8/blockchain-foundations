@@ -42,12 +42,7 @@ async function get_object_height(block: Block, block_id: string): Promise<number
   return parentHeight + 1;
 }
 
-async function validate_block_timestamp(
-  node_id: string,
-  socket: Socket,
-  block: Block,
-  block_id: string
-): Promise<boolean> {
+async function validate_block_timestamp( node_id: string, socket: Socket, block: Block, block_id: string ): Promise<boolean> {
   const now = Math.floor(Date.now() / 1000);
 
   if (block.created >= now) {
