@@ -2,6 +2,8 @@ import type { Transaction } from "./types";
 import type { UTXOState } from "./utxo";
 import { outpointKey, utxoManager } from "./utxo";
 import { objectManager } from "./object";
+import { chain_data } from "./chain";
+import { GENESIS_BLOCK_ID } from "./types";
 
 export class Mempool {
   private txids: Set<string> = new Set();
@@ -89,4 +91,21 @@ export async function rebuildMempoolFromNewChainTip(newTip: string): Promise<voi
     mempoolState.applyTransaction(txid, obj);
     mempool.add(txid);
   }
+}
+
+export async function initializeMempoolStateFromChainTip(): Promise<void> {
+  const tip = chain_data.get_chaintip();
+
+  if (tip === GENESIS_BLOCK_ID) {
+    mempoolState.reset(utxoManager.emptyState());
+    return;
+  }
+
+  if (!(await utxoManager.exists(tip))) {
+    mempoolState.reset(utxoManager.emptyState());
+    return;
+  }
+
+  const baseState = await utxoManager.get(tip);
+  mempoolState.reset(baseState);
 }

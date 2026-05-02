@@ -8,6 +8,8 @@ import { verifyTransaction } from './transaction'
 import { verifyBlock } from './block'
 import { chain_data } from './chain'
 
+import { initializeMempoolStateFromChainTip } from './mempool'
+
 const PORT = 18018
 const SERVER_ID = '95.179.176.219:' + PORT
 
@@ -242,4 +244,5 @@ async function connect_to_random_discovered_peer() {
 server.listen(PORT, async() => {
     console.log(`Server listening on port ${PORT}`)
     // await connect_to_random_discovered_peer()
+    await initializeMempoolStateFromChainTip()
 })
