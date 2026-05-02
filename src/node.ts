@@ -8,7 +8,8 @@ import { verifyTransaction } from './transaction'
 import { verifyBlock } from './block'
 import { chain_data } from './chain'
 
-import { initializeMempoolStateFromChainTip } from './mempool'
+import { initializeMempoolStateFromChainTip, mempool } from './mempool'
+
 
 const PORT = 18018
 const SERVER_ID = '95.179.176.219:' + PORT
@@ -116,15 +117,34 @@ async function handle_message(socket: Socket, id: string, message: Message) {
         blockid: chain_data.get_chaintip()
       } as Message)
       break
+    
     case 'chaintip':
       if (!(await objectManager.exists(message.blockid))) {
         await broadcast_getobject(message.blockid);
       }
       break
-
-    case 'error':
-      console.log(`[${id}]: Recieved error: ${message.name} - ${message.description}`)  
+    
+    case 'getmempool':
+      await send_message(socket, {
+        type: 'mempool',
+        txids: mempool.getTxids()
+      } as Message)
       break
+
+    case 'mempool':
+      for (const txid of message.txids) {
+        if (!(await objectManager.exists(txid))) {
+          await send_message(socket, {
+            type: 'getobject',
+            objectid: txid
+          } as Message)
+        }
+      }
+      break
+      
+      case 'error':
+        console.log(`[${id}]: Recieved error: ${message.name} - ${message.description}`)  
+        break
   }
 }
 
