@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from "path";
 import { GENESIS_BLOCK_ID } from "./types";
+import { rebuildMempoolFromNewChainTip } from './mempool';
 
 const FILENAME = './storage/chaintip.txt'
 const k = 6;
@@ -38,6 +39,7 @@ class ChainData {
 
   update(block_id: string, height: number) : void{
     if (height > this.chain_height) {
+      rebuildMempoolFromNewChainTip(block_id);
       this.chaintip = block_id;
       this.chain_height = height
 
