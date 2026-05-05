@@ -35,7 +35,7 @@ async function getBlock(blockid: string): Promise<Block>{
   return obj;
 }
 
-export async function findCommonAncestorForLongerNewChain(
+async function findCommonAncestorForLongerNewChain(
   oldTip: string,
   oldHeight: number,
   newTip: string,
@@ -61,7 +61,7 @@ export async function findCommonAncestorForLongerNewChain(
   return oldCursor;
 }
    
-export async function collectTransactionsFromAbandonedBlocks(
+async function collectTransactionsFromAbandonedBlocks(
   oldTip: string,
   commonAncestor: string
 ): Promise<string[]> {
