@@ -92,7 +92,13 @@ async function handle_message(socket: Socket, id: string, message: Message) {
             console.log(`[${id}]: Transaction verification failed`);
             return
           };
-          if (mempoolState.canApplyTransaction(obj)) mempoolState.applyTransaction(id, obj);
+          if (!mempoolState.canApplyTransaction(obj)) {
+            console.log(`[${id}]: Transaction is valid but not applicable to current mempool state`);
+            return;
+          } 
+          mempoolState.applyTransaction(objectid, obj);
+          mempool.add(objectid);
+    
           break;
         case 'block':
           if (!(await verifyBlock(id, socket, obj, objectid))) {
@@ -265,5 +271,5 @@ async function connect_to_random_discovered_peer() {
 server.listen(PORT, async() => {
     console.log(`Server listening on port ${PORT}`)
     await connect_to_random_discovered_peer()
-    await initializeMempoolStateFromChainTip()
+    await initializeMempoolStateFromChainTip(chain_data.get_chaintip());
 })

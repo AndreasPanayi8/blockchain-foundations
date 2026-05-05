@@ -1,7 +1,9 @@
 import fs from 'fs';
 import path from "path";
-import { GENESIS_BLOCK_ID } from "./types";
+import { GENESIS_BLOCK_ID, type Block } from "./types";
 import { rebuildMempoolFromNewChainTip } from './mempool';
+import { objectManager } from "./object";
+
 
 const FILENAME = './storage/chaintip.txt'
 const k = 6;
@@ -23,6 +25,66 @@ function ensureFile(): void {
   }
 }
 
+async function getBlock(blockid: string): Promise<Block>{
+  const obj = await objectManager.get(blockid);
+
+  if (obj.type !== "block"){
+    throw new Error(`Object ${blockid} is not a block`);
+  }
+
+  return obj;
+}
+
+export async function findCommonAncestorForLongerNewChain(
+  oldTip: string,
+  oldHeight: number,
+  newTip: string,
+  newHeight: number
+): Promise<string> {
+  let oldCursor: string = oldTip;
+  let newCursor: string = newTip;
+
+  while (newHeight > oldHeight) {
+    const newBlock = await getBlock(newCursor);
+    newCursor = newBlock.previd!;
+    newHeight--;
+  }
+
+  while (oldCursor !== newCursor) {
+    const oldBlock = await getBlock(oldCursor);
+    const newBlock = await getBlock(newCursor);
+
+    oldCursor = oldBlock.previd!;
+    newCursor = newBlock.previd!;
+  }
+
+  return oldCursor;
+}
+   
+export async function collectTransactionsFromAbandonedBlocks(
+  oldTip: string,
+  commonAncestor: string
+): Promise<string[]> {
+  const txids: string[] = [];
+
+  let current: string = oldTip;
+
+  while (current !== commonAncestor){
+    const block = await getBlock(current);
+
+    for (const txid of block.txids) {
+      txids.push(txid);
+    }
+
+    current = block.previd!;
+  }
+
+  return txids.reverse();
+}
+
+
+
+
 class ChainData {
   private chain_height;
   private chaintip;
@@ -37,11 +99,27 @@ class ChainData {
 
   }
 
-  update(block_id: string, height: number) : void{
+  async update(block_id: string, height: number) : Promise<void>{
     if (height > this.chain_height) {
-      rebuildMempoolFromNewChainTip(block_id);
+      const oldTip = this.chaintip;
+      const oldHeight =this.chain_height;
+
+      const commonAncestor = await findCommonAncestorForLongerNewChain(
+        oldTip,
+        oldHeight,
+        block_id,
+        height
+      );
+
+      const abandonedTxids = await collectTransactionsFromAbandonedBlocks(
+        oldTip,
+        commonAncestor
+      );
+
+      await rebuildMempoolFromNewChainTip(block_id, abandonedTxids);
+
       this.chaintip = block_id;
-      this.chain_height = height
+      this.chain_height = height;
 
       fs.writeFileSync(FILENAME, JSON.stringify({
         chaintip: this.chaintip,

@@ -78,7 +78,7 @@ export async function verifyBlock(node_id: string, socket: Socket, block: Block,
 
   // B. Ensure parent is in the DB, UTXO DB.
   // The parent's UTXO entry is written only after it passes full validation, so its presence
-  // means the entire ancestor chain is already valid — no need to re-validate it here.
+  // means the entire ancestor _da is already valid — no need to re-validate it here.
   if (block.previd !== null && !(await utxoManager.exists(block.previd))) {
     const parent = await findParentBlock(block.previd);
 
@@ -210,7 +210,7 @@ export async function verifyBlock(node_id: string, socket: Socket, block: Block,
     return false;
   }
 
-  chain_data.update(block_id, height);
+  await chain_data.update(block_id, height);
 
   return true;
 }

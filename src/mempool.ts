@@ -1,9 +1,9 @@
-import type { Transaction } from "./types";
+import { GENESIS_BLOCK_ID, type Transaction } from "./types";
 import type { UTXOState } from "./utxo";
 import { outpointKey, utxoManager } from "./utxo";
 import { objectManager } from "./object";
 import { chain_data } from "./chain";
-import { GENESIS_BLOCK_ID } from "./types";
+
 
 export class Mempool {
   private txids: Set<string> = new Set();
@@ -69,15 +69,30 @@ export class MempoolState {
 export const mempool = new Mempool();
 export const mempoolState = new MempoolState();
 
-export async function rebuildMempoolFromNewChainTip(newTip: string): Promise<void> {
-  const oldTxids = mempool.getTxids();
+export async function rebuildMempoolFromNewChainTip(
+  newTip: string,
+  abandonedTxids: string[] =[]
+): Promise<void> {
+  const oldMempoolTxids = mempool.getTxids();
+
+  const candidateTxids = [
+    ...abandonedTxids,
+    ...oldMempoolTxids,   
+  ];
 
   const baseState = await utxoManager.get(newTip);
 
   mempool.clear();
   mempoolState.reset(baseState);
 
-  for (const txid of oldTxids) {
+  const alreadyTried = new Set<string>();
+
+  for (const txid of candidateTxids) {
+    if (alreadyTried.has(txid)) {
+      continue;
+    }
+    alreadyTried.add(txid);
+
     const obj = await objectManager.get(txid);
 
     if (obj.type !== "transaction") {
@@ -93,9 +108,7 @@ export async function rebuildMempoolFromNewChainTip(newTip: string): Promise<voi
   }
 }
 
-export async function initializeMempoolStateFromChainTip(): Promise<void> {
-  const tip = chain_data.get_chaintip();
-
+export async function initializeMempoolStateFromChainTip(tip: string): Promise<void> {
   if (tip === GENESIS_BLOCK_ID) {
     mempoolState.reset(utxoManager.emptyState());
     return;
