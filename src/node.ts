@@ -96,26 +96,21 @@ async function handle_message(socket: Socket, id: string, message: Message) {
           }
 
           // Coinbase transactions are only valid inside blocks. They must not enter the mempool.
-          if ("height" in obj) {
-            console.log(`[${id}]: Coinbase transaction received standalone; not adding to mempool`);
-            return;
+          if (!("height" in obj)) {
+            if (!mempoolState.canApplyTransaction(obj)) {
+              await send_error(
+                id,
+                socket,
+                "INVALID_TX_OUTPOINT",
+                "Transaction is invalid with respect to the mempool UTXO state",
+                false
+              );
+              console.log(`[${id}]: Transaction is valid syntactically but conflicts with mempool state`);
+            }
+
+            mempoolState.applyTransaction(objectid, obj);
+            mempool.add(objectid);
           }
-
-          if (!mempoolState.canApplyTransaction(obj)) {
-            await send_error(
-              id,
-              socket,
-              "INVALID_TX_OUTPOINT",
-              "Transaction is invalid with respect to the mempool UTXO state",
-              false
-            );
-            console.log(`[${id}]: Transaction is valid syntactically but conflicts with mempool state`);
-            return;
-          }
-
-          mempoolState.applyTransaction(objectid, obj);
-          mempool.add(objectid);
-
           break;
         case 'block':
           if (!(await verifyBlock(id, socket, obj, objectid))) {
