@@ -93,6 +93,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
 
       switch (obj.type) {
         case 'transaction':
+        console.log(`[${id}]: Object ` + objectid + ` is a transaction.`);
           if (!(await verifyTransaction(id, socket, obj))) {
             console.log(`[${id}]: Transaction verification failed`);
             return;
@@ -116,6 +117,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
           }
           break;
         case 'block':
+        console.log(`[${id}]: Object ` + objectid + ` is a block.`);
           if (!(await verifyBlock(id, socket, obj, objectid))) {
             console.log(`[${id}]: Block verification failed`);
             return;
