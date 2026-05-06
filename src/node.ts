@@ -294,16 +294,16 @@ server.listen(PORT, async() => {
     console.log(`Server listening on port ${PORT}`)
     const outbound = new Socket()
 
-    outbound.connect(18018, '45.32.235.245', async () => {
+    outbound.connect(18018, '95.179.132.22', async () => {
         const id = `${outbound.remoteAddress}:${outbound.remotePort}`
-        console.log(`Outbound connected to 45.32.235.245:18018 (${id})`)
+        console.log(`Outbound connected to 95.179.132.22:18018 (${id})`)
 
         attach_handlers(outbound, id)
         await connect(outbound)
     })
 
     outbound.on('error', (err) => {
-        console.error(`Error connecting to peer 45.32.235.245:18018:`, err)
+        console.error(`Error connecting to peer 95.179.132.22:18018:`, err)
     })
     await connect_to_random_discovered_peer()
     await initializeMempoolStateFromChainTip(chain_data.get_chaintip());
