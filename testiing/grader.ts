@@ -61,10 +61,10 @@ grader.connect(PORT, IP, async () => {
     console.log(`Node disconnected`)
   })
 
-  for (const testcase of testcases) {
-    console.log('Sending: ' + JSON.stringify(testcase.msg));
+  for (const testcase of testcases[0]) {
+    console.log('Sending: ' + JSON.stringify(testcase));
     if(grader.destroyed) return;
-    grader.write(canonicalize(testcase.msg) + '\n');
-    await sleep(testcase.ms);
+    grader.write(canonicalize(testcase) + '\n');
+    await sleep(1000);
   }
 })

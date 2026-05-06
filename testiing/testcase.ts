@@ -1,206 +1,54 @@
-type Testcase = {
-  msg: Object,
-  ms: number
-};
-
-export const testcases : Testcase[] = [
-  {msg: {type:'hello', version: '0.10.1', agent:'Grader'}, ms: 10},
-  // {
-  //   msg: {
-  //     "object": {
-  //       "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //       "created": 1771159355,
-  //       "miner": "Marabu",
-  //       "nonce": "00dd82159556175752d9ba7349df67bddd237b59183747383f7b720e85c32347",
-  //       "note": "Financial Times 2026-02-13: Crypto's battle with the banks is splitting Trump's base",
-  //       "previd": null,
-  //       "txids":[],
-  //       "type":"block"
-  //     },"type":"object"}
-  // , ms: 10},
-  // {msg: {"objectid":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6","type":"getobject"}, ms: 10},
-  
-  // {
-  //   msg: {"object": {
-  //     "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //     "created":1771162955,
-  //     "miner":"grader",
-  //     "nonce":"19be8f41d0c616a4ea8e7e2accfa9d748318624e9cd39a0d53051187be1230cc",
-  //     "note":"This block has a coinbase transaction",
-  //     "previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6",
-  //     "txids":["e2e3d5919de1de1338217bfd1d364bf381c2c7336e0c85c46e4ae86232c26529"],"type":"block"},
-  //     "type":"object"
-  //   }
-  //   , ms: 4000
-  // },
-  // {msg: {"objectid":"000000001a8a21aa884e5fa85a23a372a521d0ec3d74d2aaece160d306d0d9ab","type":"getobject"}, ms: 10},
-  
-  // {
-  //   msg: {"object": {
-  //     "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //     "created":1771166555,
-  //     "miner": "grader",
-  //     "nonce": "cfe9618f4dd22f37bfc237cacd8cb930d9181b10881b65ee19ebfef4f4884fa7",
-  //     "note": "This block has another coinbase and spends earlier coinbase",
-  //     "previd": "000000001a8a21aa884e5fa85a23a372a521d0ec3d74d2aaece160d306d0d9ab",
-  //     "txids": ["a633520faec43d9dd868df547d397d3d1b0c326f9864f48eb8655f7f33cece95","f4535e84ded732f4ddacbb07133c2391844851da8e7f8b9484cff03ca833be0b"],
-  //     "type":"block"},
-  //     "type":"object"
-  //   }
-  //   , ms: 4000
-  // },
-  // {msg: {"objectid":"000000008852948c999acdfebe402d7e8a146a55c34b1a7c40960eb244b2f7e4","type":"getobject"}, ms: 10},
-  
-  // {msg: {"object": {
-  //   "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //   "created":1671148915,
-  //   "miner":"grader",
-  //   "nonce":"e3e0c078ec1440aacc008171a250a4559b317aa083284bc84c2ab1eba546c53f",
-  //   "note":"Block with invalid PoW",
-  //   "previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6",
-  //   "txids":[],
-  //   "type":"block"}
-  //   ,"type":"object"},ms: 10},
-  
-  // {msg: {
-  //   "object": {"T":"0f00000000000000000000000000000000000000000000000000000000000000",
-  //   "created":1771162955,
-  //   "miner":"grader",
-  //   "nonce":"a31d8edaa513aaa3e3e2fe930135f9942157fa3c135d1e435ba0c0b02252250d",
-  //   "note":"Block with incorrect target","previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6",
-  //   "txids":[],
-  //   "type":"block"},
-  // "type":"object"}, ms: 10},
-  
-  // {msg: {"object": {
-  //   "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //   "created":1771163955,
-  //   "miner":"grader",
-  //   "nonce":"0000000000000000000000000000000000000000000000000000000000000001"
-  //   ,"note":"Block with invalid PoW",
-  //   "previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6",
-  //   "txids":[],
-  //   "type":"block"},
-  //   "type":"object"}, ms: 10},
-
-  // {msg: {"object":{
-  //   "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //   "created":1771170155,
-  //   "miner":"grader",
-  //   "nonce":"3d9326cbbce4311f922b0a671d4c1d83c528efaee5d72dbf9cd61660d6b671d1",
-  //   "note":"This block has a coinbase transaction",
-  //   "previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6",
-  //   "txids":["6e77eb8eb23aa6c6dfb28ac72b38116d4826c6a96299199ae0013654bc71a5fb"],
-  //   "type":"block"},
-  //   "type":"object"},ms: 10},
-  // {msg: {"objectid":"0000000025686ecaf9edb4eba5146e73099636dc5f856f363313c22b3237d223","type":"getobject"}, ms: 4000},
-  // {msg: {"object": {
-  //   "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //   "created":1771173755,
-  //   "miner":"grader",
-  //   "nonce":"6a9e3d7de241ba5bd31d66cf1f0828a04ce33d0a28d55b91fd2924d243005832",
-  //   "note":"This block violates the law of conservation",
-  //   "previd":"0000000025686ecaf9edb4eba5146e73099636dc5f856f363313c22b3237d223",
-  //   "txids":["9baa94270d6d5c62dd4180f2fc8b061eda8a69ee7448a17ad7678bb6c0d2f8f0","be80036646cfdc85b27c1564a3160d44ec5c30ec14f3c401f724ec3f1742ca34"],
-  //   "type":"block"},"type":"object"}, ms: 10},
-  
-  // {msg: {"object": {
-  //   "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //   "created":1771173755,
-  //   "miner":"grader",
-  //   "nonce":"fc4506d7c75f303dcb0d68641ea04d9815e73f18f7f7770df183f8ef6c93ecb5",
-  //   "note":"This block has a transaction spending the coinbase",
-  //   "previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6",
-  //   "txids":["6e77eb8eb23aa6c6dfb28ac72b38116d4826c6a96299199ae0013654bc71a5fb","be80036646cfdc85b27c1564a3160d44ec5c30ec14f3c401f724ec3f1742ca34"]
-  //   ,"type":"block"},
-  //   "type":"object"},ms:10},
-    
-  // {msg: {"object":{
-  //   "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //   "created":1771177355,
-  //   "miner":"grader",
-  //   "nonce":"db24f2b5f712ec3a3698eaf48fadc1b3ee86c140e2a6d60d9aba0272975ea5fa",
-  //   "note":"This block contains an invalid transaction",
-  //   "previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6",
-  //   "txids":["6e77eb8eb23aa6c6dfb28ac72b38116d4826c6a96299199ae0013654bc71a5fb","e52a193089f62a81a839f29ae81f078eefb73d606b054af67bf46f824adfe527"],
-  //   "type":"block"},
-  //   "type":"object"}, ms:100},
-
-
-  // {msg: {"object": {"T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //   "created":1771180955,
-  //   "miner":"grader",
-  //   "nonce":"d16b98c66bb8262a291eb1c2d9d743245c4c88303490003cb4d3702bbc15835b",
-  //   "note":"This block has 2 coinbase transactions",
-  //   "previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6",
-  //   "txids":["6e77eb8eb23aa6c6dfb28ac72b38116d4826c6a96299199ae0013654bc71a5fb","6e77eb8eb23aa6c6dfb28ac72b38116d4826c6a96299199ae0013654bc71a5fb"]
-  //   ,"type":"block"},"type":"object"}, ms: 50}
-
-  // {msg: {"object":{
-  //     "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //     "created":1771184555,
-  //     "miner":"grader",
-  //     "nonce":"36a150836fc4a7dbfa40d64c9cf616c0d4a3ac18e6bf46fbc2514ea45bdaaf5c",
-  //     "note":"This block has a coinbase transaction",
-  //     "previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6",
-  //     "txids":["96339757c036018f3f272b2d8128248241e6ecfe0f9047d7f2cfe2fde3df267a"],
-  //     "type":"block"},"type":"object"}
-  // , ms: 4000},
-  // {msg: {"objectid":"00000000556048ae26893c5bd08e9539b2f62ca5b5847b87a6c8e9800f0da467","type":"getobject"}, ms:1000},
-  // {msg:{"object":{
-  //   "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //   "created":1771188155,
-  //   "miner":"grader",
-  //   "nonce":"a2275563b730b184200896bff2c8b9bb88206e21c64a67659dcffead83003c27",
-  //   "note":"This block spends coinbase transaction twice",
-  //   "previd":"00000000556048ae26893c5bd08e9539b2f62ca5b5847b87a6c8e9800f0da467",
-  //   "txids":["0308131405b190db3c94052b9b7185a62538010c8e5298cb104e31edc5a68877","d38db64554dcb26d5246ec7f4ea365b654f1bb1710a9c6615e8053cea11ca547"],
-  //   "type":"block"},"type":"object"}, ms:50}
-
-  // {msg: {"object":{
-  //   "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //   "created":1771191755,
-  //   "miner":"grader",
-  //   "nonce":"dd8c12b37231a171ce8909f379bc86b7fb3be1599eec863f7d221d967f8bfb47",
-  //   "note":"This block has a coinbase transaction",
-  //   "previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6",
-  //   "txids":["c825462af622841b4be6c023c32eecc0a723be845ee867efee41debe24a5fb8c"],
-  //   "type":"block"},"type":"object"}, ms: 4000},
-  // {msg: {"objectid":"000000002285ac3f587def52a366014f5d2e2ecc38e6527a14c11f912c7fa9fc","type":"getobject"}, ms: 50},
-  // {msg: {"object":{
-  //   "T":"00000000abc00000000000000000000000000000000000000000000000000000"
-  //   ,"created":1771195355,
-  //   "miner":"grader",
-  //   "nonce":"4875ff49c105353fefd45057f42790c4efd727714d90074970d4e8458e34b467",
-  //   "note":"This block spends coinbase transaction once (it is valid)",
-  //   "previd":"000000002285ac3f587def52a366014f5d2e2ecc38e6527a14c11f912c7fa9fc",
-  //   "txids":["01d62f3494326ff8f0541b9d0d06395be32d6761d919be4ae311bc5172ba80d7"],
-  //   "type":"block"},"type":"object"}, ms: 4000},
-  // {msg: {"objectid":"0000000075e0bff767796c8b3beb771aeda55c2d18b947ab13bb01334f4038ed","type":"getobject"}, ms: 1000},
-  // {msg: {"object":{
-  //   "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //   "created":1771198955,
-  //   "miner":"grader",
-  //   "nonce":"65888dc80eb6b0b12879e47c68c49a5e9215bcdf1677825d4fcc1aa92b650b44",
-  //   "note":"This block spends coinbase transaction again (it is invalid)",
-  //   "previd":"0000000075e0bff767796c8b3beb771aeda55c2d18b947ab13bb01334f4038ed",
-  //   "txids":["ddb6a2d270a34f5007237d4f34814b48262c26ef94cc0b9245d8ca1dafbc4070"],
-  //   "type":"block"},"type":"object"}, ms: 50}
-
-  // {msg: {"object":{
-  //   "height":1,
-  //   "outputs":[{"pubkey":"e39b7117f6bd94dd174f96556fc0850f564b873e8b873e507556493a200176b3",
-  //   "value":50000000000000}],
-  //   "type":"transaction"},"type":"object"},ms:50},
-  // {msg: {"objectid":"e5ed65492e6b9fc7bdeaaf3ae1b7aa1d850ffec4cd9903067e01496ccef80d8b","type":"getobject"}, ms: 50},
-  // {msg: {"object": {
-  //   "T":"00000000abc00000000000000000000000000000000000000000000000000000",
-  //   "created":1771198955,
-  //   "miner":"grader",
-  //   "nonce":"c70416fef43c0e191778bb04df0945c100db9241d640ac5e1c2b4a9562246f94",
-  //   "note":"This block spends a coinbase transaction not in its prev blocks",
-  //   "previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6",
-  //   "txids":["c623a2700681dbc7a9a31bcd1d5128777adb107ad0f143d9367ee0dbb5a6bd0f"],
-  //   "type":"block"},"type":"object"}, ms:50}
-
-]
+export const testcases = [
+  // [
+  //   {"agent":"Grader 1","type":"hello","version":"0.10.0"},
+  //   {"type": 'getmempool'}
+  // ],
+  //   [
+  //   {"agent":"Grader 1","type":"hello","version":"0.10.0"},
+  //   {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1771162425,"miner":"grader","nonce":"4c5fa3d69d0499ca56eac3bbfc5b72a2eb25784350ea42630e173c0d2139cb72","note":"Second block","previd":"00000000168896a4d1068a6715d2665aa7532ba313b53eae9f24ba959b6c4209","txids":["1fcad232b113e80c8e7b3d7e18822d280101e54df3eeed31e63668038995deb4"],"type":"block"},"type":"object"},
+  //   {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1771161950,"miner":"grader","nonce":"b806d607eb4c42b9cbaa0a2c4dd733674d3ac0715557bd7111280172c5049deb","note":"First block","previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6","txids":["ea8ffdb1b4fcd6baaa2ce6b9f65e19541dbaf2581b63f0c7838c0d195d580e5a"],"type":"block"},"type":"object"},
+  //   {"object":{"height":1,"outputs":[{"pubkey":"ff78f35ba8ca27881df6e60d2aeb8218142cac8843ea31a661196efb4758ee84","value":400}],"type":"transaction"},"type":"object"},
+  //   {"object":{"inputs":[{"outpoint":{"index":0,"txid":"ea8ffdb1b4fcd6baaa2ce6b9f65e19541dbaf2581b63f0c7838c0d195d580e5a"},"sig":"18515b60211a3beb899c8253f1b022a68504ca2e3049397acf60b90612dc645f4571542e17aecc1f4dd86bcc2e5600cc656b1cb2204c1a3dc699add34038490b"},{"outpoint":{"index":0,"txid":"1fcad232b113e80c8e7b3d7e18822d280101e54df3eeed31e63668038995deb4"},"sig":"4e46054d587cd4065b1a330405a6b967491cd227082055f67e5cff4454de490ec01e1b6e4fdf38e25faeea163134b823ed61b10197412479a4797a7a9a8d9b08"}],"outputs":[{"pubkey":"ff78f35ba8ca27881df6e60d2aeb8218142cac8843ea31a661196efb4758ee84","value":10}],"type":"transaction"},"type":"object"},
+  //   {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1771164704,"miner":"grader","nonce":"0da3c5fed09bea8981b53c8400e4c5fcab6bf36be099e1fe67c08fd989a57684","note":"Third block","previd":"000000003db1978533974fbf5bf1454227a918cee2ce62119036a04ead3744b9","txids":["73b7c5f5c99c39d4d4c346cf0e9a7f08be71ac3c01e33149c6fa180a4da142a2"],"type":"block"},"type":"object"},
+  //   {"objectid":"0000000007287e86430ec07c957d7b3e3393faa816ecafb7a76bfb0b16f281e9","type":"getobject"}
+  // ],
+  // [
+  //   {"agent":"Grader 1","type":"hello","version":"0.10.0"},
+  //   // {"agent":"Grader 2","type":"hello","version":"0.10.0"},
+  //   {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1771160811,"miner":"grader","nonce":"24835312eef75df5920643a0d41fbbb895b6f718107ad8e2139f8fd8059bbba6","note":"First block","previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6","txids":["177b6f38d2f0a7d4203e4e60d523c5858f8d4355ac1011dd1700322551a82059"],"type":"block"},"type":"object"},
+  //   {"object":{"height":1,"outputs":[{"pubkey":"c7286e119a08164b14ec2b53872e033a561b16f821549f3281fa87ef7edcf7cd","value":400}],"type":"transaction"},"type":"object"},
+  //   {"object":{"inputs":[{"outpoint":{"index":0,"txid":"177b6f38d2f0a7d4203e4e60d523c5858f8d4355ac1011dd1700322551a82059"},"sig":"e433cf758114a3994b0a50f3cfd6309f471b70e034716df3c32e5b95969dcadc499bdb73c0dbf70455c18d41dd5a66c551998faa7231decba5dd76319a975a00"},{"outpoint":{"index":0,"txid":"177b6f38d2f0a7d4203e4e60d523c5858f8d4355ac1011dd1700322551a82059"},"sig":"e433cf758114a3994b0a50f3cfd6309f471b70e034716df3c32e5b95969dcadc499bdb73c0dbf70455c18d41dd5a66c551998faa7231decba5dd76319a975a00"}],"outputs":[{"pubkey":"c7286e119a08164b14ec2b53872e033a561b16f821549f3281fa87ef7edcf7cd","value":10}],"type":"transaction"},"type":"object"},
+  //   {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1777987707,"miner":"grader","nonce":"0000000000000000000000000000000000000000000000000100000036592827","note":"Fifth block","previd":"000000001ef653e6db5df67a14bf03c8b402cdd6010308afc852072a7526a6cc","txids":["fe77690d46b2c548a63b1c8ae65a0f884c197eb48733572c348ddacac7865d3e","eea96a5deb4c81343786306d47fbf0e54cafbc5a1bcd91e24fd49d2f80b0e596"],"type":"block"},"type":"object"}
+  // ],
+  // [
+  //   {"agent":"Grader 1","type":"hello","version":"0.10.0"},
+  //   // {"agent":"Grader 2","type":"hello","version":"0.10.0"},
+  //   {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1771160429,"miner":"grader","nonce":"1390f6ede5112794ce519b6993b7fdd213b24f5d8e07452c25fc88b8c42998a6","note":"This block contains a note which has more than 128 characters. It is an invalid block. You should ensure that the note and miner fields in a block are ASCII-printable strings up to 128 characters long each.","previd":"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6","txids":[],"type":"block"},"type":"object"}
+  // ],
+  // [
+  //   {"agent":"Grader 1","type":"hello","version":"0.10.0"},
+  //   {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1777987707,"miner":"grader","nonce":"0000000000000000000000000000000000000000000000000100000036592827","note":"Fifth block","previd":"000000001ef653e6db5df67a14bf03c8b402cdd6010308afc852072a7526a6cc","txids":["fe77690d46b2c548a63b1c8ae65a0f884c197eb48733572c348ddacac7865d3e","eea96a5deb4c81343786306d47fbf0e54cafbc5a1bcd91e24fd49d2f80b0e596"],"type":"block"},"type":"object"},
+  //   {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1777987408,"miner":"grader","nonce":"00000000000000000000000000000000000000000000000002000000b1051042","note":"Fourth block","previd":"000000004e888d7d60924bed8b0b513bbae95833696951992ba2790b122987c9","txids":["da6b6973dcc173cea6912faadbf5b2cdf5b74125956e113b3df902ef189273db","6a60637750c4f33cec28887e66bd8ba6fd7b2ba1f95d27616ba158020f403722"],"type":"block"},"type":"object"},
+  //   {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1777987121,"miner":"grader","nonce":"00000000000000000000000000000000000000000000000000000000a9b931ab","note":"Third block","previd":"000000001a44fc1d1a8adbc4691aa404f51dfd7f68b23275d0bc153822d0aac3","txids":["82ab91c098188d3d7c5cb954514be144ffd915afc90f549861b1e398eead398e","db78c043963cda9e5569f99c32f82e4dc9dd9bf9fba381dddcf8b91ae7992528"],"type":"block"},"type":"object"},
+  //   {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1777986683,"miner":"grader","nonce":"00000000000000000000000000000000000000000000000001000000053f3a15","note":"Second block","previd":"0000000028f242e0b4085399fb3d0e630885bbc5603a2e97c679d950b2e865cc","txids":["9159a7ef6af243c58fb92a05c243daba888dc0dd86aa4e645b3d91c9466644a0"],"type":"block"},"type":"object"},
+  //   {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1777986274,"miner":"grader","nonce":"00000000000000000000000000000000000000000000000000000000bdbe834a","note":"First block","previd":"000000001bdc729cd607bf767044a1f7155eb5dc649ba1b022c62d222caef6e0","txids":["a5e3b7bfd80607ecfdebd3d695d375b0e9bf1ed091df951f66d9fe4bc77ea7b4"],"type":"block"},"type":"object"},
+  //   {"object":{"height":282,"outputs":[{"pubkey":"71924b19eeb926e65acfdb94750ad00520ad8702dbd08f8da549295f2e1ebcb4","value":400}],"type":"transaction"},"type":"object"},
+  //   {"object":{"inputs":[{"outpoint":{"index":0,"txid":"da6b6973dcc173cea6912faadbf5b2cdf5b74125956e113b3df902ef189273db"},"sig":"1296c9b8242cddc9936eaf2961fbab0351d20477dd978eeca3655632c388d757729971af98e3c8e9cbbffd518433061a3beb30916a5d28fbaa83d3ea79349e09"}],"outputs":[{"pubkey":"277fb42b913b4b3e70141804971a2f045f71f41c1e0d6d1e71c6da3848a796dc","value":10}],"type":"transaction"},"type":"object"},
+  //   {"object":{"inputs":[{"outpoint":{"index":0,"txid":"fe77690d46b2c548a63b1c8ae65a0f884c197eb48733572c348ddacac7865d3e"},"sig":"e5c3b91f3eab9eb05972d1012dd96403a947b0291a33a7eb93c709d71e8c2cd61c6905fd54adb4207a2565cfc804b225a094e6549cab853a3135928b20a2140a"}],"outputs":[{"pubkey":"e7bf6f01608204824a3dc5eaeafe55c0d75ca59d3929fe2957882bd2f61e9899","value":10}],"type":"transaction"},"type":"object"},
+  //   {"object":{"inputs":[{"outpoint":{"index":0,"txid":"a5e3b7bfd80607ecfdebd3d695d375b0e9bf1ed091df951f66d9fe4bc77ea7b4"},"sig":"0bd6bf8922b8bb0c05d289fddfa1350dbc69948d49bfb04d25088df7d0cdae4d18404ac05d26183a878ca5ac3245ec4fdc83152a46b280097a6fecac580b5d02"}],"outputs":[{"pubkey":"e64686e62a5f51c2b2a1d2d2c1efc818f0811c3dd70b94a61a6c912d074cf8eb","value":20}],"type":"transaction"},"type":"object"},
+  //   {"object":{"inputs":[{"outpoint":{"index":0,"txid":"9159a7ef6af243c58fb92a05c243daba888dc0dd86aa4e645b3d91c9466644a0"},"sig":"2ffc594b881ee0acbee41691f61a8f83e4702104340e2e0f309324b6f3dacc6ce256473f72a98f4dbf185f8c4ba3682089a29ec75eb7f38af437144a7d2b8704"}],"outputs":[{"pubkey":"625094f436835fe0f0d7f1ce1c8ed585119582b782c1143d2520fddc8ba90672","value":20}],"type":"transaction"},"type":"object"},
+  //   {"object":{"height":287,"outputs":[{"pubkey":"779b0fd14b9e1366932765ba11b587f374442324d867c47cefa833bcee4b18f0","value":400}],"type":"transaction"},"type":"object"},
+  //   {"type":"getmempool"}
+  // ],
+  [
+    {"agent":"Grader 1","type":"hello","version":"0.10.0"},
+    {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1777988279,"miner":"grader","nonce":"000000000000000000000000000000000000000000000000020000007a0b735c","note":"New sixth block","previd":"000000005d005ce0f438e9ac0f34ddc28ffb02fc7605a3ac4ddae1a0fd3e0d4d","txids":[],"type":"block"},"type":"object"},
+    {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1777987927,"miner":"grader","nonce":"00000000000000000000000000000000000000000000000002000000c7f9a772","note":"New fifth block","previd":"000000004e896fef42e661d3dc6233d05d07847c94ee2bfc0cf6bfccf81acccb","txids":[],"type":"block"},"type":"object"},
+    {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1777987773,"miner":"grader","nonce":"00000000000000000000000000000000000000000000000000000000b7d21cc6","note":"New fourth block","previd":"000000004e888d7d60924bed8b0b513bbae95833696951992ba2790b122987c9","txids":["b5f2cc89f27e5c625713089cf14d7a2ecba86008ac5facd70b7bef20e8ad7c78"],"type":"block"},"type":"object"},
+    {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1777987121,"miner":"grader","nonce":"00000000000000000000000000000000000000000000000000000000a9b931ab","note":"Third block","previd":"000000001a44fc1d1a8adbc4691aa404f51dfd7f68b23275d0bc153822d0aac3","txids":["82ab91c098188d3d7c5cb954514be144ffd915afc90f549861b1e398eead398e","db78c043963cda9e5569f99c32f82e4dc9dd9bf9fba381dddcf8b91ae7992528"],"type":"block"},"type":"object"},
+    {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1777986683,"miner":"grader","nonce":"00000000000000000000000000000000000000000000000001000000053f3a15","note":"Second block","previd":"0000000028f242e0b4085399fb3d0e630885bbc5603a2e97c679d950b2e865cc","txids":["9159a7ef6af243c58fb92a05c243daba888dc0dd86aa4e645b3d91c9466644a0"],"type":"block"},"type":"object"},
+    {"object":{"T":"00000000abc00000000000000000000000000000000000000000000000000000","created":1777986274,"miner":"grader","nonce":"00000000000000000000000000000000000000000000000000000000bdbe834a","note":"First block","previd":"000000001bdc729cd607bf767044a1f7155eb5dc649ba1b022c62d222caef6e0","txids":["a5e3b7bfd80607ecfdebd3d695d375b0e9bf1ed091df951f66d9fe4bc77ea7b4"],"type":"block"},"type":"object"},
+    {"object":{"height":282,"outputs":[{"pubkey":"71924b19eeb926e65acfdb94750ad00520ad8702dbd08f8da549295f2e1ebcb4","value":400}],"type":"transaction"},"type":"object"},
+    {"type":"getmempool"}
+  ]
+];
