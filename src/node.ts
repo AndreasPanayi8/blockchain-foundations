@@ -111,9 +111,10 @@ async function handle_message(socket: Socket, id: string, message: Message) {
               );
               console.log(`[${id}]: Transaction is valid syntactically but conflicts with mempool state`);
             }
-
-            mempoolState.applyTransaction(objectid, obj);
-            mempool.add(objectid);
+            else {
+              mempoolState.applyTransaction(objectid, obj);
+              mempool.add(objectid);
+            }
           }
           break;
         case 'block':
