@@ -141,6 +141,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
       break;
     }
     case 'getchaintip':
+      console.log(`[${id}]: Recieved getchaintip message, sending chaintip`);
       await send_message(socket, {
         type:'chaintip',
         blockid: chain_data.get_chaintip()
@@ -148,12 +149,14 @@ async function handle_message(socket: Socket, id: string, message: Message) {
       break
     
     case 'chaintip':
+      console.log(`[${id}]: Recieved chaintip message, updating chaintip`);
       if (!(await objectManager.exists(message.blockid))) {
         await broadcast_getobject(message.blockid);
       }
       break
     
     case 'getmempool':
+      console.log(`[${id}]: Recieved getmempool message, sending mempool`);
       await send_message(socket, {
         type: 'mempool',
         txids: mempool.getTxids()
@@ -161,6 +164,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
       break
 
     case 'mempool':
+      console.log(`[${id}]: Recieved mempool message, updating mempool`);
       for (const txid of message.txids) {
         if (!(await objectManager.exists(txid))) {
           await send_message(socket, {
