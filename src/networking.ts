@@ -33,9 +33,9 @@ export async function connect(socket: Socket) {
       agent: 'MMA'
   } as Message)
 
-  await send_message(socket, {
-      type: 'getpeers'
-  } as Message)
+//   await send_message(socket, {
+//       type: 'getpeers'
+//   } as Message)
 
   await send_message(socket, {
     type: 'getchaintip'
