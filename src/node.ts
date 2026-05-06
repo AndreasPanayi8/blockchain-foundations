@@ -7,16 +7,11 @@ import { send_message, send_error, connect, broadcast_ihaveobject, parse_peer_ad
 import { verifyTransaction } from './transaction'
 import { verifyBlock } from './block'
 import { chain_data } from './chain'
-import { heightManager } from './height'
-
-import { initializeMempoolStateFromChainTip, mempool, mempoolState } from './mempool'
-
-
 
 const PORT = 18018
 const SERVER_ID = '95.179.176.219:' + PORT
 
-const banned_ips = ['::ffff:95.179.178.136', '::ffff:78.141.219.35']
+const banned_ips = ['::ffff:95.179.178.136']
 
 async function handle_message(socket: Socket, id: string, message: Message) {
   switch (message.type) {
@@ -92,46 +87,23 @@ async function handle_message(socket: Socket, id: string, message: Message) {
         case 'transaction':
           if (!(await verifyTransaction(id, socket, obj))) {
             console.log(`[${id}]: Transaction verification failed`);
-            return;
-          }
-
-          if (!mempoolState.canApplyTransaction(obj)) {
-            await send_error(
-              id,
-              socket,
-              "INVALID_TX_OUTPOINT",
-              "Transaction is invalid with respect to the mempool UTXO state",
-              false
-            );
-            console.log(`[${id}]: Transaction is valid syntactically but conflicts with mempool state`);
-            return;
-          }
-
-          mempoolState.applyTransaction(objectid, obj);
-          mempool.add(objectid);
-
+            return
+          };
           break;
         case 'block':
           if (!(await verifyBlock(id, socket, obj, objectid))) {
             console.log(`[${id}]: Block verification failed`);
             return;
-          }
+          } 
           break
       }
 
-      console.log(`[${id}]: Verification succeeded, storing object`);
-
+      console.log(`[${id}]: Veryfication succeded, storing object`)
       try {
-        await objectManager.put(obj);
-
-        if (obj.type === "block") {
-          const height = await heightManager.get(objectid);
-          await chain_data.update(objectid, height);
-        }
-
+        await objectManager.put(obj)
         broadcast_ihaveobject(id, objectid);
-      } catch (err) {
-        console.error(`[${id}]: object store / chain update failed`, err);
+      } catch(err) {
+        console.error(`[${id}]: object store failed`, err);
       }
 
       break;
@@ -142,34 +114,15 @@ async function handle_message(socket: Socket, id: string, message: Message) {
         blockid: chain_data.get_chaintip()
       } as Message)
       break
-    
     case 'chaintip':
       if (!(await objectManager.exists(message.blockid))) {
         await broadcast_getobject(message.blockid);
       }
       break
-    
-    case 'getmempool':
-      await send_message(socket, {
-        type: 'mempool',
-        txids: mempool.getTxids()
-      } as Message)
-      break
 
-    case 'mempool':
-      for (const txid of message.txids) {
-        if (!(await objectManager.exists(txid))) {
-          await send_message(socket, {
-            type: 'getobject',
-            objectid: txid
-          } as Message)
-        }
-      }
+    case 'error':
+      console.log(`[${id}]: Recieved error: ${message.name} - ${message.description}`)  
       break
-      
-      case 'error':
-        console.log(`[${id}]: Recieved error: ${message.name} - ${message.description}`)  
-        break
   }
 }
 
@@ -288,6 +241,5 @@ async function connect_to_random_discovered_peer() {
 // Start the server
 server.listen(PORT, async() => {
     console.log(`Server listening on port ${PORT}`)
-    await connect_to_random_discovered_peer()
-    await initializeMempoolStateFromChainTip(chain_data.get_chaintip());
+    // await connect_to_random_discovered_peer()
 })
