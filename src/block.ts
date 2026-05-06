@@ -4,7 +4,6 @@ import { send_error, broadcast_getobject } from "./networking";
 import { get_transaction } from "./transaction";
 import { outpointKey, utxoManager, type UTXOEntry } from "./utxo";
 import { objectManager } from "./object";
-import { chain_data } from "./chain";
 import { heightManager } from "./height";
 import { GENESIS_BLOCK_ID } from "./types";
 
@@ -209,8 +208,6 @@ export async function verifyBlock(node_id: string, socket: Socket, block: Block,
     console.error(`[${node_id}] utxo/height manager put failed`, e);
     return false;
   }
-
-  await chain_data.update(block_id, height);
 
   return true;
 }
