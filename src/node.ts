@@ -86,7 +86,10 @@ async function handle_message(socket: Socket, id: string, message: Message) {
       console.log(`[${id}]: Recieved object ` + objectid);
 
       const known = await objectManager.exists(objectid);
-      if (known) return;
+      if (known)  {
+        console.log(`[${id}]: Object ` + objectid + ' already in database.');
+        return;
+      }
 
       switch (obj.type) {
         case 'transaction':
