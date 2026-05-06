@@ -7,8 +7,10 @@ import { send_message, send_error, connect, broadcast_ihaveobject, parse_peer_ad
 import { verifyTransaction } from './transaction'
 import { verifyBlock } from './block'
 import { chain_data } from './chain'
+import { heightManager } from './height'
 
 import { initializeMempoolStateFromChainTip, mempool, mempoolState } from './mempool'
+
 
 
 const PORT = 18018
@@ -90,15 +92,24 @@ async function handle_message(socket: Socket, id: string, message: Message) {
         case 'transaction':
           if (!(await verifyTransaction(id, socket, obj))) {
             console.log(`[${id}]: Transaction verification failed`);
-            return
-          };
-          if (!mempoolState.canApplyTransaction(obj)) {
-            console.log(`[${id}]: Transaction is valid but not applicable to current mempool state`);
             return;
-          } 
+          }
+
+          if (!mempoolState.canApplyTransaction(obj)) {
+            await send_error(
+              id,
+              socket,
+              "INVALID_TX_OUTPOINT",
+              "Transaction is invalid with respect to the mempool UTXO state",
+              false
+            );
+            console.log(`[${id}]: Transaction is valid syntactically but conflicts with mempool state`);
+            return;
+          }
+
           mempoolState.applyTransaction(objectid, obj);
           mempool.add(objectid);
-    
+
           break;
         case 'block':
           if (!(await verifyBlock(id, socket, obj, objectid))) {
@@ -108,12 +119,19 @@ async function handle_message(socket: Socket, id: string, message: Message) {
           break
       }
 
-      console.log(`[${id}]: Veryfication succeded, storing object`)
+      console.log(`[${id}]: Verification succeeded, storing object`);
+
       try {
-        await objectManager.put(obj)
+        await objectManager.put(obj);
+
+        if (obj.type === "block") {
+          const height = await heightManager.get(objectid);
+          await chain_data.update(objectid, height);
+        }
+
         broadcast_ihaveobject(id, objectid);
-      } catch(err) {
-        console.error(`[${id}]: object store failed`, err);
+      } catch (err) {
+        console.error(`[${id}]: object store / chain update failed`, err);
       }
 
       break;

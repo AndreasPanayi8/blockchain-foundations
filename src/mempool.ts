@@ -38,6 +38,7 @@ export class MempoolState {
 
   canApplyTransaction(transaction: Transaction): boolean {
     if ("height" in transaction) {
+      console.log(`Coinbase transaction received standalone; not adding to mempool`);
       return false; // coinbase transactions do not enter the mempool
     }
 
