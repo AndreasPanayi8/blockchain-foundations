@@ -109,9 +109,9 @@ async function handle_message(socket: Socket, id: string, message: Message) {
                 "Transaction is invalid with respect to the mempool UTXO state",
                 false
               );
-              console.log(`[${id}]: Transaction is valid syntactically but conflicts with mempool state`);
-            }
-            else {
+              console.log(`[${id}]: Transaction ` + objectid + ` is valid syntactically but conflicts with mempool state`);
+            } else {
+              console.log(`[${id}]: Applying transaction` + objectid);
               mempoolState.applyTransaction(objectid, obj);
               mempool.add(objectid);
             }
