@@ -2,10 +2,9 @@ import { GENESIS_BLOCK_ID, type Transaction } from "./types";
 import type { UTXOState } from "./utxo";
 import { outpointKey, utxoManager } from "./utxo";
 import { objectManager } from "./object";
-import { chain_data } from "./chain";
 
 
-export class Mempool {
+class Mempool {
   private txids: Set<string> = new Set();
 
   has(txid: string): boolean {
@@ -55,8 +54,8 @@ export class MempoolState {
   }
 
   applyTransaction(txid: string, transaction: Transaction): void {
-    if ("height" in transaction) {
-      throw new Error("Cannot apply coinbase transaction to mempool state");
+    if (!this.canApplyTransaction(transaction) || 'height' in transaction) {
+      return;
     }
 
     for (const input of transaction.inputs) {
@@ -65,6 +64,7 @@ export class MempoolState {
     }
 
     utxoManager.addOutputs(this.state, txid, transaction.outputs);
+    mempool.add(txid);
   }
 }
 
@@ -101,12 +101,7 @@ export async function rebuildMempoolFromNewChainTip(
       continue;
     }
 
-    if (!mempoolState.canApplyTransaction(obj)) {
-      continue;
-    }
-
     mempoolState.applyTransaction(txid, obj);
-    mempool.add(txid);
   }
 }
 
