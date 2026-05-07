@@ -61,7 +61,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
       
       const known = await objectManager.exists(objectid);
       if (!known) {
-        await send_error(id, socket, 'UNKNOWN_OBJECT', `Object ${objectid} not found`, false);
+        await send_error(id, socket, 'UNKNOWN_OBJECT', `Object ${objectid} not found`);
         break;
       }
       
@@ -106,8 +106,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
                 id,
                 socket,
                 "INVALID_TX_OUTPOINT",
-                "Transaction is invalid with respect to the mempool UTXO state",
-                false
+                "Transaction is invalid with respect to the mempool UTXO state"
               );
               console.log(`[${id}]: Transaction ` + objectid + ` is valid syntactically but conflicts with mempool state`);
             } else {

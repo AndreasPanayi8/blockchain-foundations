@@ -13,15 +13,16 @@ export async function send_error(node_id: string, socket: Socket, name:
     "INTERNAL_ERROR" | "INVALID_FORMAT" | "UNKNOWN_OBJECT" |
     "UNFINDABLE_OBJECT" | "INVALID_HANDSHAKE" | "INVALID_TX_OUTPOINT" | 
     "INVALID_TX_SIGNATURE" |"INVALID_TX_CONSERVATION" | "INVALID_BLOCK_COINBASE" |
-     "INVALID_BLOCK_TIMESTAMP" | "INVALID_BLOCK_POW" | "INVALID_GENESIS", description: string, is_fatal : boolean = true) {
+     "INVALID_BLOCK_TIMESTAMP" | "INVALID_BLOCK_POW" | "INVALID_GENESIS", description: string) {
   await send_message(socket, {
     type: 'error',
     name: name,
     description: description
   });
-  
-  if (is_fatal) {
-    console.error(`[${node_id}]: ` + description);
+
+  console.error(`[${node_id}]: ` + description);
+
+  if (name === 'INVALID_HANDSHAKE' || name === 'INVALID_FORMAT') {
     socket.end();
   } 
 }
