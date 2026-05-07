@@ -36,11 +36,11 @@ export class MempoolState {
   }
 
   canApplyTransaction(transaction: Transaction): boolean {
-    console.log("state: " ,this.state)
     if ("height" in transaction) {
       console.log(`Coinbase transaction received standalone; not adding to mempool`);
       return false; // coinbase transactions do not enter the mempool
     }
+
 
     for (const input of transaction.inputs) {
       const key = outpointKey(input.outpoint.txid, input.outpoint.index);
