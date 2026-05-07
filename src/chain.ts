@@ -65,7 +65,7 @@ async function collectTransactionsFromAbandonedBlocks(
   oldTip: string,
   commonAncestor: string
 ): Promise<string[]> {
-  const txids: string[] = [];
+  let txids: string[] = [];
 
   let current: string = oldTip;
 
@@ -77,7 +77,7 @@ async function collectTransactionsFromAbandonedBlocks(
       block_txids.push(txid);
     }
 
-    txids.concat(block_txids.reverse());
+    txids = txids.concat(block_txids.reverse());
     current = block.previd!;
   }
 

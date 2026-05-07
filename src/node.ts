@@ -21,11 +21,11 @@ const banned_ips = ['::ffff:95.179.178.136', '::ffff:78.141.219.35']
 async function handle_message(socket: Socket, id: string, message: Message) {
   switch (message.type) {
     case 'getpeers':
-      //   console.log(`[${id}]: Requested peers, sending discovered peers`) 
-      // await send_message(socket, {
-      //   type: 'peers',
-      //   peers: Array.from(discovered_peers).concat(SERVER_ID)
-      // } as Message)
+        console.log(`[${id}]: Requested peers, sending discovered peers`) 
+      await send_message(socket, {
+        type: 'peers',
+        peers: Array.from(discovered_peers).concat(SERVER_ID)
+      } as Message)
       break
 
     case 'peers':
