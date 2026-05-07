@@ -120,8 +120,9 @@ async function handle_message(socket: Socket, id: string, message: Message) {
         }
       }
 
-
+      console.log("MARCO")
       if (obj.type === 'transaction' && !("height" in obj)) {
+      console.log("POLO")
         if (!mempoolState.canApplyTransaction(obj)) {
           await send_error(
             id,
