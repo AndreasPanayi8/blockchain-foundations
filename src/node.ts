@@ -88,6 +88,7 @@ async function handle_message(socket: Socket, id: string, message: Message) {
       const known = await objectManager.exists(objectid);
       if (known)  {
         console.log(`[${id}]: Object ` + objectid + ' already in database.');
+        if (obj.type === 'transaction' &&mempoolState.canApplyTransaction(obj)) mempoolState.applyTransaction(objectid,obj)
         return;
       }
 
