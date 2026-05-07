@@ -71,11 +71,13 @@ async function collectTransactionsFromAbandonedBlocks(
 
   while (current !== commonAncestor){
     const block = await getBlock(current);
+    let block_txids: string[] = [];
 
     for (const txid of block.txids) {
-      txids.push(txid);
+      block_txids.push(txid);
     }
 
+    txids.concat(block_txids.reverse());
     current = block.previd!;
   }
 
