@@ -18,7 +18,7 @@ const BASE_REWARD = 50_000_000_000_000;
 const MINER_NAME = "MMA";
 
 const MINER_PUBKEY =
-  "3eece7ce52199c3e2f61e641fdb960a2d6de2a40280e4b016c76b76b021eea5f";
+  "62692085b5cd55583fad2b57c2cc9ff420882b63ab244e44f66f6249fcf259f0";
 
 const STUDENT_IDS = ["id1", "id2", "id3"];
 
