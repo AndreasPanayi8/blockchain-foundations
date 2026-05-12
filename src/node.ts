@@ -18,7 +18,7 @@ const SERVER_ID = '95.179.176.219:' + PORT
 
 const banned_ips = ['::ffff:95.179.178.136', '::ffff:78.141.219.35']
 
-async function handle_message(socket: Socket, id: string, message: Message) {
+export async function handle_message(socket: Socket, id: string, message: Message) {
   switch (message.type) {
     case 'getpeers':
         console.log(`[${id}]: Requested peers, sending discovered peers`) 
