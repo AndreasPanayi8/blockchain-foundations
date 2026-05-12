@@ -20,7 +20,7 @@ const MINER_NAME = "MMA";
 const MINER_PUBKEY =
   "62692085b5cd55583fad2b57c2cc9ff420882b63ab244e44f66f6249fcf259f0";
 
-const STUDENT_IDS = ["id1", "id2", "id3"];
+const STUDENT_IDS = ["7115142400006", "7115142500002", "7115142400008"];
 
 function makeCoinbase(height: number, value: number): Transaction {
   return {
