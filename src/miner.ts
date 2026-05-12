@@ -13,7 +13,7 @@ const miner_sockets = new Set<Socket>()
 // ─── Send helpers ────────────────────────────────────────────────────────────
 
 async function send_block_template(socket: Socket, block: Block): Promise<void> {
-  const msg = canonicalize({ type: 'block', block })
+  const msg = canonicalize(block)
   if (msg === undefined) throw new Error('Could not canonicalize block template')
   socket.write(msg + '\n')
 }
