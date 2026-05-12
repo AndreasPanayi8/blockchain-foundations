@@ -1,138 +1,155 @@
-import  {Socket, createServer } from 'net'
+import { Socket, createServer } from 'net'
 import { broadcast_ihaveobject, send_error, send_message } from './networking'
 import { ObjectMessageSchema, type Block, type Message, type ObjectMessage } from './types'
-import { objectManager } from './object';
-import { verifyBlock } from './block';
-import { chain_data } from './chain';
-import { writeBlockTemplate } from './blockbuilder'
-import { heightManager } from './height';
-
-async function refreshBlockTemplate(reason: string) {
-  try {
-    const tip = chain_data.get_chaintip()
-    await writeBlockTemplate(tip)
-    console.log(`[miner]: Refreshed block template after ${reason}`)
-  } catch (err) {
-    console.error(`[miner]: Failed to refresh block template after ${reason}`, err)
-  }
-}
-
-async function broadcast_target_block(block: Block) {
-  for (const sock of miner_sockets) {
-    send_target_block(sock, block)
-  }
-}
-
-async function send_target_block(sock: Socket, block: Block) {
-    await send_message(sock, {
-        type: 'object',
-        object: block
-    } as Message);
-}
-
-
-async function handle_object(id: string, socket: Socket, message: ObjectMessage) {
-  const obj = message.object
-
-  if (obj.type === 'transaction') {
-    await send_error(id, socket, 'INVALID_FORMAT', 'Expected block not transaction')
-    return
-  }
-
-  const objectid = objectManager.objectId(obj)
-
-  console.log(`[${id}]: Received object ${objectid}`)
-
-  if (!(await verifyBlock(id, socket, obj, objectid))) {
-    console.log(`[${id}]: Block verification failed`)
-    return
-  }
-
-  console.log(`[${id}]: Verification succeeded, storing object`)
-
-  try {
-    await objectManager.put(obj)
-
-    // Gossip after validation and storage.
-    broadcast_ihaveobject(id, objectid)
-
-    // verifyBlock should already have stored the height.
-    const height = await heightManager.get(objectid)
-
-    // Let the normal chain logic decide whether this becomes the active tip.
-    await chain_data.update(objectid, height)
-
-    // Build a fresh template after accepting our mined block.
-    await refreshBlockTemplate('accepted mined block')
-  } catch (err) {
-    console.error(`[${id}]: object store failed`, err)
-  }
-}
+import { objectManager } from './object'
+import { verifyBlock } from './block'
+import { chain_data } from './chain'
+import { buildBlockTemplate } from './blockbuilder'
+import { heightManager } from './height'
+import canonicalize from 'canonicalize'
 
 const MINER_PORT = 1302
-
-let miner_sockets = new Set<Socket>();
-
-const miner = createServer( (socket) => {
-  if (socket.remoteAddress !== undefined) {
-    const id = `Miner ${socket.remoteAddress}:${socket.remotePort}`
-    console.log(`Miner connected from ${id}`)
-
-    miner_sockets.add(socket);
-
-    socket.setEncoding('utf8')  
-    let buffer = ''
-  
-    socket.on('data', async (data) => {
+ 
+const miner_sockets = new Set<Socket>()
+ 
+// ─── Send helpers ────────────────────────────────────────────────────────────
+ 
+async function send_block_template(socket: Socket, block: Block): Promise<void> {
+  const msg = canonicalize({ type: 'block', block })
+  if (msg === undefined) throw new Error('Could not canonicalize block template')
+  socket.write(msg + '\n')
+}
+ 
+// ─── Push a fresh template to one or all connected miners ───────────────────
+ 
+async function pushTemplateTo(socket: Socket, previd: string): Promise<void> {
+  try {
+    const block = await buildBlockTemplate(previd)
+    await send_block_template(socket, block)
+    console.log(`[miner]: Sent fresh template (parent ${previd}) to ${socket.remoteAddress}`)
+  } catch (err) {
+    console.error(`[miner]: Failed to build/send template to ${socket.remoteAddress}`, err)
+  }
+}
+ 
+// Called from node.ts whenever the chain tip advances.
+export async function pushTemplateToAllMiners(newTip: string): Promise<void> {
+  if (miner_sockets.size === 0) return
+  for (const sock of miner_sockets) {
+    await pushTemplateTo(sock, newTip)
+  }
+}
+ 
+// ─── Handle a solved block arriving from the miner ──────────────────────────
+ 
+async function handle_object(id: string, socket: Socket, message: ObjectMessage): Promise<void> {
+  const obj = message.object
+ 
+  if (obj.type === 'transaction') {
+    await send_error(id, socket, 'INVALID_FORMAT', 'Expected block, not transaction')
+    return
+  }
+ 
+  const objectid = objectManager.objectId(obj)
+  console.log(`[${id}]: Received mined block ${objectid}`)
+ 
+  if (!(await verifyBlock(id, socket, obj, objectid))) {
+    console.log(`[${id}]: Mined block verification failed`)
+    return
+  }
+ 
+  console.log(`[${id}]: Mined block verified, storing`)
+ 
+  try {
+    await objectManager.put(obj)
+ 
+    const height = await heightManager.get(objectid)
+    await chain_data.update(objectid, height)
+ 
+    // Gossip to the network.
+    broadcast_ihaveobject(id, objectid)
+ 
+    // chain_data.update already calls pushTemplateToAllMiners via node.ts,
+    // but the miner that just submitted this block needs a refresh too
+    // since it won't receive its own ihaveobject.
+    await pushTemplateTo(socket, objectid)
+  } catch (err) {
+    console.error(`[${id}]: Mined block store / chain update failed`, err)
+  }
+}
+ 
+// ─── Per-connection message handler ─────────────────────────────────────────
+ 
+function attach_miner_handlers(socket: Socket, id: string): void {
+  socket.setEncoding('utf8')
+  let buffer = ''
+ 
+  socket.on('data', async (data) => {
     buffer += data
-
+ 
     const messages = buffer.split('\n')
     while (messages.length > 1) {
       const msg = messages.shift()
-
-      // Error handling
-      
-      if (msg === undefined) {
-          console.error(`[${id}]: Error defragmenting messages`)
-          return
-      }
-
-      // Parse JSON
-      let message
+      if (msg === undefined) continue
+ 
+      let parsed: unknown
       try {
-        message = JSON.parse(msg)
-      } catch (err) {
-        await send_error(id, socket, 'INVALID_FORMAT', 'Error parsing message as JSON');
+        parsed = JSON.parse(msg)
+      } catch {
+        await send_error(id, socket, 'INVALID_FORMAT', 'Error parsing message as JSON')
         return
       }
-      
-      // Check protocol schema
+ 
+      // 'getblock' request — build and send a fresh template
+      if (
+        parsed !== null &&
+        typeof parsed === 'object' &&
+        (parsed as Record<string, unknown>).type === 'getblock'
+      ) {
+        await pushTemplateTo(socket, chain_data.get_chaintip())
+        continue
+      }
+ 
+      // 'object' message — miner found a valid nonce
+      let objectMessage: ObjectMessage
       try {
-        message = ObjectMessageSchema.parse(message)
-      } catch(err) {
-        await send_error(id, socket, 'INVALID_FORMAT', 'Unknown protocol message');
+        objectMessage = ObjectMessageSchema.parse(parsed)
+      } catch {
+        await send_error(id, socket, 'INVALID_FORMAT', 'Unknown miner protocol message')
         return
       }
-
-      await handle_object(id, socket, message);
+ 
+      await handle_object(id, socket, objectMessage)
     }
+ 
     buffer = messages[0] ?? ''
   })
-
+ 
   socket.on('error', (err) => {
     console.error(`[${id}]: socket error`, err)
   })
-
+ 
   socket.on('close', () => {
-    miner_sockets.delete(socket);
-    console.log(`[${id}]: Disconnected`)
+    miner_sockets.delete(socket)
+    console.log(`[${id}]: Miner disconnected`)
   })
-  }
+}
+ 
+// ─── Server ──────────────────────────────────────────────────────────────────
+ 
+const miner_server = createServer((socket) => {
+  if (socket.remoteAddress === undefined) return
+ 
+  const id = `Miner ${socket.remoteAddress}:${socket.remotePort}`
+  console.log(`Miner connected from ${id}`)
+ 
+  miner_sockets.add(socket)
+  attach_miner_handlers(socket, id)
+ 
+  // Send an initial template as soon as the miner connects.
+  pushTemplateTo(socket, chain_data.get_chaintip())
 })
-
-
-miner.listen(MINER_PORT, async () => {
+ 
+miner_server.listen(MINER_PORT, () => {
   console.log(`Miner server listening on port ${MINER_PORT}`)
-  const tip = chain_data.get_chaintip()
-  await writeBlockTemplate(tip)
 })
