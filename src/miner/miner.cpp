@@ -3,6 +3,7 @@
 #include <random>
 #include <cstring>
 #include <immintrin.h>
+#include <iostream>
 
 static std::mt19937_64 generator(std::random_device{}());
 static std::uniform_int_distribution<uint64_t> distribution(0, std::numeric_limits<uint64_t>::max());
@@ -22,7 +23,7 @@ void initialize_object(Object &object, const char *postfix, size_t len) {
 
   std::memcpy(object.postfix, postfix, len);
 
-  bytes_to_hex((const uint8_t*)object.nonce, object.postfix + len);
+  bytes_to_hex((const uint8_t*)object.nonce, object.postfix);
 }
 
 void increment_nonce(Object &object) {

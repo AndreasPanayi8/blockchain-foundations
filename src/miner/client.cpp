@@ -8,8 +8,8 @@
 #include <cstring>
 
 namespace Client {
-  // const char HOST[] = "95.179.176.219";
-  const char HOST[] = "127.0.0.1";
+  const char HOST[] = "95.179.176.219";
+  // const char HOST[] = "127.0.0.1";
   const int PORT = 1302;
 
   int sock = 0;
@@ -35,13 +35,6 @@ namespace Client {
       std::cout << "Connect failed" << std::endl;
       exit(-1);
     }
-
-    std::string line;
-
-    line = readline();
-    std::cout << "Recieved: " << line << std::endl;
-    line = readline();
-    std::cout << "Recieved: " << line << std::endl;
   }
 
   std::string readline() {

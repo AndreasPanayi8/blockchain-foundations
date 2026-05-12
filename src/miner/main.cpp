@@ -27,10 +27,11 @@ void mine(int i, const char *object_postfix, size_t len, const blake2s_state &st
 
 int main() {
   Client::connect();
-  Client::quit();
 
-  char objectStr[] = "{\"object\":{\"T\":\"00000000abc00000000000000000000000000000000000000000000000000000\",\"created\":1771170155,\"miner\":\"grader\",\"nonce\":\"fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0\",\"previd\":\"00000000522473196b73bc619a8b18472c4cb4c6caf785a13fa32aaae7222ff6\",\"txids\":[\"6e77eb8eb23aa6c6dfb28ac72b38116d4826c6a96299199ae0013654bc71a5fb\"],\"type\":\"block\"},\"type\":\"object\"}";
-  size_t len = std::strlen(objectStr) - 129;
+  std::string objectStr = Client::readline();
+  std::cout << "Recieved: " << objectStr << std::endl;
+  const int NONCE_OFFSET = 125;
+  size_t len = objectStr.length() - NONCE_OFFSET;
 
   blake2s_state state;
 
@@ -38,14 +39,14 @@ int main() {
       return -1;
   }
 
-  blake2s_update(&state, (uint8_t *)objectStr, 129);
+  blake2s_update(&state, (uint8_t *)objectStr.c_str(), NONCE_OFFSET);
 
   const int n = 16;
   std::vector<std::thread> threads;
   std::atomic<uint64_t> cnt[n] = {};
   int found = 0;
   for (int i = 0; i < n; ++i) {
-      threads.emplace_back(mine, i+1, objectStr + 129, len, state, std::ref(found), std::ref(cnt[i]));
+      threads.emplace_back(mine, i+1, objectStr.c_str() + NONCE_OFFSET, len, state, std::ref(found), std::ref(cnt[i]));
   }
 
   auto last_time = std::chrono::steady_clock::now();
@@ -67,5 +68,5 @@ int main() {
   for (auto& t : threads) t.join();
 
 
-
+  Client::quit();
 }
