@@ -12,6 +12,8 @@ import { heightManager } from './height'
 import { initializeMempoolStateFromChainTip, mempool, mempoolState } from './mempool'
 
 
+import './miner'
+
 
 const PORT = 18018
 const SERVER_ID = '95.179.176.219:' + PORT
