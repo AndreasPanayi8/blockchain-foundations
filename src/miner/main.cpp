@@ -6,10 +6,15 @@
 #include <cstring>
 #include <atomic>
 #include <thread>
+#include <mutex>
 #include <vector>
 #include <functional>
 #include "./blake2.h"
 #include "client.hpp"
+
+
+char nonce[64];
+std::mutex mutex;
 
 void mine(int i, const char *object_postfix, size_t len, const blake2s_state &state, int &found, std::atomic<uint64_t> &cnt) {
   alignas(64) Object obj;
@@ -18,6 +23,8 @@ void mine(int i, const char *object_postfix, size_t len, const blake2s_state &st
   while (found == 0) {
     if (check_pow(obj, state, len)) {
       found = i;
+      std::lock_guard<std::mutex> lock(mutex);
+      std::memcpy(nonce, obj.postfix,64);
       break;
     }
     increment_nonce(obj);
@@ -30,7 +37,8 @@ int main() {
 
   std::string objectStr = Client::readline();
   std::cout << "Recieved: " << objectStr << std::endl;
-  const int NONCE_OFFSET = 125;
+  const int NONCE_OFFSET = 116;
+
   size_t len = objectStr.length() - NONCE_OFFSET;
 
   blake2s_state state;
@@ -67,6 +75,9 @@ int main() {
 
   for (auto& t : threads) t.join();
 
+  objectStr.replace(NONCE_OFFSET, 64, nonce);
+
+  std::cout << objectStr << '\n';
 
   Client::quit();
 }
