@@ -3,6 +3,7 @@ import path from "path";
 import { GENESIS_BLOCK_ID, type Block } from "./types";
 import { rebuildMempoolFromNewChainTip } from './mempool';
 import { objectManager } from "./object";
+import { pushTemplateToAllMiners } from './miner';
 
 
 const FILENAME = './storage/chaintip.txt'
@@ -85,8 +86,6 @@ async function collectTransactionsFromAbandonedBlocks(
 }
 
 
-
-
 class ChainData {
   private chain_height;
   private chaintip;
@@ -127,6 +126,8 @@ class ChainData {
         chaintip: this.chaintip,
         chain_height: this.chain_height
       }), "utf8");
+
+      await pushTemplateToAllMiners(block_id);
     }
   }
 
