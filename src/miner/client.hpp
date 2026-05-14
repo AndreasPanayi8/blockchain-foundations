@@ -5,6 +5,7 @@
 namespace Client {
   void connect();
   std::string readline();
+  void send(std::string str);
   void quit();
 }
 

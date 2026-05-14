@@ -16,11 +16,12 @@
 char nonce[64];
 std::mutex mutex;
 
-void mine(int i, const char *object_postfix, size_t len, const blake2s_state &state, int &found, std::atomic<uint64_t> &cnt) {
+void mine(std::stop_token token, int i, const char *object_postfix, size_t len, const blake2s_state &state, int &found, std::atomic<uint64_t> &cnt) {
   alignas(64) Object obj;
   initialize_object(obj, object_postfix, len);
   
   while (found == 0) {
+    if (token.stop_requested()) return;
     if (check_pow(obj, state, len)) {
       found = i;
       std::lock_guard<std::mutex> lock(mutex);
@@ -31,12 +32,7 @@ void mine(int i, const char *object_postfix, size_t len, const blake2s_state &st
     ++cnt;
   }
 }
-
-int main() {
-  Client::connect();
-
-  std::string objectStr = Client::readline();
-  std::cout << "Recieved: " << objectStr << std::endl;
+void miner_controller(std::stop_token token, std::string objectStr) {
   const int NONCE_OFFSET = 116;
 
   size_t len = objectStr.length() - NONCE_OFFSET;
@@ -44,21 +40,22 @@ int main() {
   blake2s_state state;
 
   if (blake2s_init(&state, BLAKE2S_OUTBYTES) != 0) {
-      return -1;
+      return;
   }
 
   blake2s_update(&state, (uint8_t *)objectStr.c_str(), NONCE_OFFSET);
 
   const int n = 16;
-  std::vector<std::thread> threads;
+  std::vector<std::jthread> threads;
   std::atomic<uint64_t> cnt[n] = {};
   int found = 0;
   for (int i = 0; i < n; ++i) {
-      threads.emplace_back(mine, i+1, objectStr.c_str() + NONCE_OFFSET, len, state, std::ref(found), std::ref(cnt[i]));
+      threads.emplace_back(mine, token, i+1, objectStr.c_str() + NONCE_OFFSET, len, state, std::ref(found), std::ref(cnt[i]));
   }
 
   auto last_time = std::chrono::steady_clock::now();
   while(found == 0) {
+    if (token.stop_requested()) return;
     std::this_thread::sleep_for(std::chrono::seconds(5));
     uint64_t total = 0;
     for (int i = 0;i < n;++i) {
@@ -77,7 +74,22 @@ int main() {
 
   objectStr.replace(NONCE_OFFSET, 64, nonce);
 
-  std::cout << objectStr << '\n';
+  objectStr = "{\"object\":"+objectStr+",\"type\":\"object\"}\n";
+  std::cout << "Sending: " << objectStr << std::endl;
+  Client::send(objectStr);
+}
 
+int main() {
+  Client::connect();
+
+  std::jthread controller;
+  while (true) {
+    std::string objectStr = Client::readline();
+    std::cout << "Recieved: " << objectStr << std::endl;
+
+    controller.request_stop();
+    controller = std::jthread(miner_controller, objectStr);
+  }
+ 
   Client::quit();
 }

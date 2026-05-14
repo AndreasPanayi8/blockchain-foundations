@@ -64,6 +64,10 @@ namespace Client {
     
   }
 
+  void send(std::string str) {
+    write(sock, str.c_str(), str.length());
+  }
+
   void quit() {
     close(sock);
   }

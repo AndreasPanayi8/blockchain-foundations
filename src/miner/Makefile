@@ -1,6 +1,6 @@
 CXX = clang++
 CC = clang
-CXXFLAGS = -Ofast -march=native -flto -mavx2 -mfma
+CXXFLAGS = -std=c++20 -Ofast -march=native -flto -mavx2 -mfma
 CCFLAGS = -Ofast -march=native -flto -mavx2 -mfma
 
 OBJS = miner.o main.o blake2s.o client.o
