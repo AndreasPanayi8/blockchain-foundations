@@ -1,33 +1,44 @@
 # Marabu Node Implementation
 
-##  File structure
+In this repository there is:
+- A typescript implementation of a Marabu node
+- A C++ implementation of a Marabu miner for x86 architecture
+- A simple typesript tester 
 
-The source code for the node is inside the `src/` folder which contains three files.
-- `node.ts`: The implementation of the node's networking functionality
-- `peer.ts`: Peer handling helper functions for storing and loading the peers
-- `type.ts`: Protocol validation using zod
+## Node
 
-The `storage/` folder is used to store the information that need to be saved after reboots. It contains:
-- `discovered_peers.txt`: The peers that are discovered, stored in plain text format
+The protocol of the node is described here:
+https://www.marabu.dev/protocol
 
-## Node execution
+In order to start the node run:
+```
+bun install 
+bun ./src/node.ts```
 
-In order to start the node using bun run:
-``` bun ./src/node.ts```
+## Miner
 
-## Message handling
+The compilation of the miner is done by `clang++`. In order to compile and start the miner run:
+```
+cd ./src/miner/
+make
+./miner```
 
-The node accepts every message type that the protocol describes.
+The miner will connect to `HOST:PORT` defined by `src/miner/client.cpp` and will expect to recieve a block in Marabu's format.
 
-The current implementation of the node only handles hello, getpeers, peer or error messeges. The rest of the valid messages are ignored.
+The miner will start mining that block and it will send the mined object to `HOST:PORT`.
 
-## Peer discovery
+If the miner recieves another block by `HOST:PORT` it will stop mining the current block and will start mine the new one.
 
-A peer address is considered valid only if it is of the form `<host>:<port>` where `<host>` is IPv4, IPv6 or any dns hostname that is not a localhost. 
+In order to achieve maximum hashrate you could try to adjust n in `src/miner/miner.cpp` which is the miner thread count. 
 
-The node discovers another peer if:
-- The peer sends a hello message
-- The peer is in a valid peers message. Note that, if a single peer address is invalid in an incoming peer array, then the whole peers message is considered invalid.
+## Testing
+
+In `testing/` there is a tester. In order to start it run:
+```
+bun install 
+bun ./testing/tester.ts```
+
+This will run the first testcase which is defined in `testing/testcase.ts`. Each testcase is a list of messeges that the tester will send to the node.
 
 ## Contributors
 
